@@ -40,7 +40,7 @@ const char* argv0;
  * Get the pathname of the socket
  * 
  * @param   site  The site
- * @return        The pathname of the socket
+ * @return        The pathname of the socket, `NULL` on error
  */
 static char* get_socket_pathname(libgamma_site_state_t* site)
 {
@@ -94,6 +94,42 @@ static char* get_socket_pathname(libgamma_site_state_t* site)
  fail:
   free(name);
   return NULL;
+}
+
+
+/**
+ * Parse adjustment method name (or stringised number)
+ * 
+ * @param   arg  The adjustment method name (or stringised number)
+ * @return       The adjustment method, -1 (negative) on error
+ */
+static int get_method(char* arg)
+{
+#if LIBGAMMA_METHOD_MAX > 5
+# warning libgamma has added more adjustment methods
+#endif
+  
+  char* p;
+  
+  if (!strcmp(arg, "dummy"))    return LIBGAMMA_METHOD_DUMMY;
+  if (!strcmp(arg, "randr"))    return LIBGAMMA_METHOD_X_RANDR;
+  if (!strcmp(arg, "vidmode"))  return LIBGAMMA_METHOD_X_VIDMODE;
+  if (!strcmp(arg, "drm"))      return LIBGAMMA_METHOD_LINUX_DRM;
+  if (!strcmp(arg, "gdi"))      return LIBGAMMA_METHOD_W32_GDI;
+  if (!strcmp(arg, "quartz"))   return LIBGAMMA_METHOD_QUARTZ_CORE_GRAPHICS;
+  
+  if (!*arg || (/* avoid overflow: */ strlen(arg) > 4))
+    goto bad;
+  for (p = arg; *p; p++)
+    if (('0' > *p) || (*p > '9'))
+      goto bad;
+  
+  return atoi(arg);
+  
+ bad:
+  fprintf(stderr, "%s: unrecognised adjustment method name: %s\n", argv0, arg);
+  errno = 0;
+  return -1;
 }
 
 
