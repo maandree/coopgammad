@@ -24,6 +24,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "arg.h"
 #include "output.h"
 #include "util.h"
 
@@ -32,7 +33,7 @@
 /**
  * The name of the process
  */
-const char* argv0;
+char* argv0;
 
 
 
@@ -161,25 +162,54 @@ static char* get_crtc_name(libgamma_crtc_information_t* info, libgamma_crtc_stat
 }
 
 
+/**
+ * Print usage information and exit
+ */
+static void usage(void)
+{
+  printf("Usage: %s [-m method] [-s site] [-p]\n", argv0);
+  exit(1);
+}
+
+
 int main(int argc, char** argv)
 {
-  int method, gerror, rc = 1;
+  int method = -1, gerror, rc = 1, preserve = 0;
+  char *sitename = NULL;
   libgamma_site_state_t site;
   libgamma_partition_state_t* partitions = NULL;
   libgamma_crtc_state_t* crtcs = NULL;
   struct output* outputs = NULL;
   size_t i, j, n, n0, crtcs_n = 0;
   
-  argv0 = argc ? argv[0] : "gammad";
-  
   memset(&site, 0, sizeof(site));
   
+  ARGBEGIN
+    {
+    case 's':
+      sitename = EARGF(usage());
+      break;
+    case 'm':
+      method = get_method(EARGF(usage()));
+      if (method < 0)
+	goto fail;
+      break;
+    case 'p':
+      preserve = 1;
+      break;
+    default:
+      usage();
+    }
+  ARGEND;
+  if (argc > 0)
+    usage();
+  
   /* Get method */
-  if (libgamma_list_methods(&method, 1, 0) < 1)
+  if ((method < 0) && (libgamma_list_methods(&method, 1, 0) < 1))
     return fprintf(stderr, "%s: no adjustment method available\n", argv0), 1;
   
   /* Get site */
-  if ((gerror = libgamma_site_initialise(&site, method, NULL)))
+  if ((gerror = libgamma_site_initialise(&site, method, sitename)))
     goto fail_libgamma;
   
   /* Get partitions */
