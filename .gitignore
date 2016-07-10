@@ -1,0 +1,14 @@
+bin/
+obj/
+\#*\#
+*~
+*.bak
+*.orig
+*.o
+*.su
+*.so
+*.out
+*.pdf
+*.dvi
+*.ps
+*.info
