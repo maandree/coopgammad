@@ -151,3 +151,4 @@ size_t output_unmarshal(struct output* this, const void* buf);
 __attribute__((pure))
 #endif
 int output_cmp_by_name(const void* a, const void* b);
+
