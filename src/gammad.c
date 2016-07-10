@@ -18,19 +18,83 @@
 #include <libgamma.h>
 
 #include <errno.h>
+#include <pwd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "output.h"
+#include "util.h"
 
 
 
 /**
  * The name of the process
  */
-char* argv0;
+const char* argv0;
 
+
+
+/**
+ * Get the pathname of the socket
+ * 
+ * @param   site  The site
+ * @return        The pathname of the socket
+ */
+static char* get_socket_pathname(libgamma_site_state_t* site)
+{
+  const char* rundir = getenv("XDG_RUNTIME_DIR");
+  const char* username = "";
+  char* name = NULL;
+  char* p;
+  char* rc;
+  struct passwd* pw;
+  size_t n;
+  
+  if (site->site)
+    {
+      name = memdup(site->site, strlen(site->site) + 1);
+      if (name == NULL)
+	goto fail;
+    }
+  else if ((name = libgamma_method_default_site(site->method)))
+    {
+      name = memdup(name, strlen(name) + 1);
+      if (name == NULL)
+	goto fail;
+    }
+  
+  if (name != NULL)
+    switch (site->method)
+      {
+      case LIBGAMMA_METHOD_X_RANDR:
+      case LIBGAMMA_METHOD_X_VIDMODE:
+	if ((p = strrchr(name, ':')))
+	  if ((p = strchr(p, '.')))
+	    *p = '\0';
+      default:
+	break;
+      }
+  
+  if (!rundir || !*rundir)
+    rundir = "/tmp";
+  
+  if ((pw = getpwuid(getuid())))
+    username = pw->pw_name ? pw->pw_name : "";
+  
+  n = sizeof("%s/.gammad/~%s/%i%s%s") + 3 * sizeof(int);
+  n += strlen(rundir) + strlen(username) + strlen(name);
+  if (!(rc = malloc(n)))
+    goto fail;
+  sprintf(rc, "%s/.gammad/~%s/%i%s%s",
+	  rundir, username, site->method, name ? "." : "", name ? name : "");
+  return rc;
+  
+ fail:
+  free(name);
+  return NULL;
+}
 
 
 /**
@@ -40,7 +104,7 @@ char* argv0;
  * @param   crtc  libgamma's state for the CRTC
  * @return        The name of the CRTC, `NULL` on error
  */
-static char* get_name(libgamma_crtc_information_t* info, libgamma_crtc_state_t* crtc)
+static char* get_crtc_name(libgamma_crtc_information_t* info, libgamma_crtc_state_t* crtc)
 {
   if ((info->edid_error == 0) && (info->edid != NULL))
     return libgamma_behex_edid(info->edid, info->edid_length);
@@ -125,7 +189,7 @@ int main(int argc, char** argv)
 	  outputs[i].green_size == 0 ||
 	  outputs[i].blue_size  == 0)
 	outputs[i].supported = 0;
-      outputs[i].name        = get_name(&info, crtcs + i);
+      outputs[i].name        = get_crtc_name(&info, crtcs + i);
       saved_errno = errno;
       outputs[i].crtc        = crtcs + i;
       libgamma_crtc_information_destroy(&info);

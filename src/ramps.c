@@ -26,7 +26,7 @@
 /**
  * The name of the process
  */
-extern char* argv0;
+extern const char* argv0;
 
 
 
