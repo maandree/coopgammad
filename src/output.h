@@ -19,43 +19,8 @@
 
 #include <libgamma.h>
 
+#include "ramps.h"
 
-/**
- * Gamma ramps union for all
- * lbigamma gamma ramps types
- */
-union gamma_ramps
-{
-  /**
-   * Ramps with 8-bit value
-   */
-  libgamma_gamma_ramps8_t u8;
-  
-  /**
-   * Ramps with 16-bit value
-   */
-  libgamma_gamma_ramps16_t u16;
-  
-  /**
-   * Ramps with 32-bit value
-   */
-  libgamma_gamma_ramps32_t u32;
-  
-  /**
-   * Ramps with 64-bit value
-   */
-  libgamma_gamma_ramps64_t u64;
-  
-  /**
-   * Ramps with `float` value
-   */
-  libgamma_gamma_rampsf_t f;
-  
-  /**
-   * Ramps with `double` value
-   */
-  libgamma_gamma_rampsd_t d;
-};
 
 
 /**
@@ -79,14 +44,20 @@ struct output
   size_t red_size;
   
   /**
-   * The number of stops in the red gamma ramp
+   * The number of stops in the green gamma ramp
    */
   size_t green_size;
   
   /**
-   * The number of stops in the red gamma ramp
+   * The number of stops in the blue gamma ramp
    */
   size_t blue_size;
+  
+  /**
+   * `.red_size + .green_size + .blue_size`
+   * multiplied by the byte-size of each stop
+   */
+  size_t ramps_size;
   
   /**
    * Whether gamma ramps are supported

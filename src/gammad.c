@@ -129,6 +129,8 @@ int main(int argc, char** argv)
       saved_errno = errno;
       outputs[i].crtc        = crtcs + i;
       libgamma_crtc_information_destroy(&info);
+      outputs[i].ramps_size = outputs[i].red_size + outputs[i].green_size + outputs[i].blue_size;
+      /* outputs[i].ramps_size will be multipled by the stop-size later */
       errno = saved_errno;
       if (outputs[i].name == NULL)
 	goto fail;
@@ -154,24 +156,30 @@ int main(int argc, char** argv)
       switch (outputs[i].depth)
 	{
 	case 8:
+	  outputs[i].ramps_size *= sizeof(uint8_t);
 	  LOAD_RAMPS(8, u8);
 	  break;
 	case 16:
+	  outputs[i].ramps_size *= sizeof(uint16_t);
 	  LOAD_RAMPS(16, u16);
 	  break;
 	case 32:
+	  outputs[i].ramps_size *= sizeof(uint32_t);
 	  LOAD_RAMPS(32, u32);
 	  break;
 	default:
 	  outputs[i].depth = 64;
 	  /* fall through */
 	case 64:
+	  outputs[i].ramps_size *= sizeof(uint64_t);
 	  LOAD_RAMPS(64, u64);
 	  break;
 	case -1:
+	  outputs[i].ramps_size *= sizeof(float);
 	  LOAD_RAMPS(f, f);
 	  break;
 	case -2:
+	  outputs[i].ramps_size *= sizeof(double);
 	  LOAD_RAMPS(d, d);
 	  break;
 	}
