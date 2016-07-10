@@ -25,10 +25,12 @@
 #include "output.h"
 
 
+
 /**
  * The name of the process
  */
 char* argv0;
+
 
 
 /**
