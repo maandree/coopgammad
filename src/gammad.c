@@ -17,14 +17,46 @@
  */
 #include <libgamma.h>
 
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "output.h"
 
 
+/**
+ * The name of the process
+ */
 char* argv0;
 
+
+/**
+ * Get the name of a CRTC
+ * 
+ * @param   info  Information about the CRTC
+ * @param   crtc  libgamma's state for the CRTC
+ * @return        The name of the CRTC, `NULL` on error
+ */
+static char* getname(libgamma_crtc_information_t* info, libgamma_crtc_state_t* crtc)
+{
+  if ((info->edid_error == 0) && (info->edid != NULL))
+    return libgamma_behex_edid(info->edid, info->edid_length);
+  else if ((info->connector_name_error == 0) && (info->connector_name != NULL))
+    {
+      char* name = malloc(3 * sizeof(size_t) + strlen(info->connector_name) + 2);
+      if (name != NULL)
+	sprintf(name, "%zu.%s", crtc->partition->partition, info->connector_name);
+      return name;
+    }
+  else
+    {
+      char* name = malloc(2 * 3 * sizeof(size_t) + 2);
+      if (name != NULL)
+	sprintf(name, "%zu.%zu", crtc->partition->partition, crtc->crtc);
+      return name;
+    }
+}
 
 
 int main(int argc, char** argv)
@@ -33,6 +65,7 @@ int main(int argc, char** argv)
   libgamma_site_state_t site;
   libgamma_partition_state_t* partitions = NULL;
   libgamma_crtc_state_t* crtcs = NULL;
+  struct output* outputs = NULL;
   size_t i, j, n, n0, crtcs_n = 0;
   
   argv0 = argv[0];
@@ -67,12 +100,122 @@ int main(int argc, char** argv)
       if ((gerror = libgamma_crtc_initialise(crtcs + j, partitions + i, j - n0)))
 	goto fail_libgamma;
   
+  /* Get CRTC information */
+  if (crtcs_n)
+    if (!(outputs = calloc(crtcs_n, sizeof(*outputs))))
+      goto fail;
+  for (i = 0; i < crtcs_n; i++)
+    {
+      libgamma_crtc_information_t info;
+      int saved_errno;
+      libgamma_get_crtc_information(&info, crtcs + i,
+				    LIBGAMMA_CRTC_INFO_EDID |
+				    LIBGAMMA_CRTC_INFO_MACRO_RAMP |
+				    LIBGAMMA_CRTC_INFO_GAMMA_SUPPORT |
+				    LIBGAMMA_CRTC_INFO_CONNECTOR_NAME);
+      outputs[i].depth       = info.gamma_depth_error   ? 0 : info.gamma_depth;
+      outputs[i].red_size    = info.gamma_size_error    ? 0 : info.red_gamma_size;
+      outputs[i].green_size  = info.gamma_size_error    ? 0 : info.green_gamma_size;
+      outputs[i].blue_size   = info.gamma_size_error    ? 0 : info.blue_gamma_size;
+      outputs[i].supported   = info.gamma_support_error ? 0 : info.gamma_support;
+      if (outputs[i].depth      == 0 ||
+	  outputs[i].red_size   == 0 ||
+	  outputs[i].green_size == 0 ||
+	  outputs[i].blue_size  == 0)
+	outputs[i].supported = 0;
+      outputs[i].name        = getname(&info, crtcs + i);
+      saved_errno = errno;
+      outputs[i].crtc        = crtcs + i;
+      libgamma_crtc_information_destroy(&info);
+      errno = saved_errno;
+      if (outputs[i].name == NULL)
+	goto fail;
+    }
+  
+  /* Load current gamma ramps */
+#define LOAD_RAMPS(SUFFIX, MEMBER) \
+  do \
+    { \
+      libgamma_gamma_ramps##SUFFIX##_initialise(&(outputs[i].saved_ramps.MEMBER)); \
+      gerror = libgamma_crtc_get_gamma_ramps##SUFFIX(outputs[i].crtc, &(outputs[i].saved_ramps.MEMBER)); \
+      if (gerror) \
+	{ \
+	  libgamma_perror(argv0, gerror); \
+	  outputs[i].supported = LIBGAMMA_NO; \
+	  libgamma_gamma_ramps##SUFFIX##_destroy(&(outputs[i].saved_ramps.MEMBER)); \
+	  memset(&(outputs[i].saved_ramps.MEMBER), 0, sizeof(outputs[i].saved_ramps.MEMBER)); \
+	} \
+    } \
+  while (0)
+  for (i = 0; i < crtcs_n; i++)
+    if (outputs[i].supported != LIBGAMMA_NO)
+      switch (outputs[i].depth)
+	{
+	case 8:
+	  LOAD_RAMPS(8, u8);
+	  break;
+	case 16:
+	  LOAD_RAMPS(16, u16);
+	  break;
+	case 32:
+	  LOAD_RAMPS(32, u32);
+	  break;
+	default:
+	  outputs[i].depth = 64;
+	  /* fall through */
+	case 64:
+	  LOAD_RAMPS(64, u64);
+	  break;
+	case -1:
+	  LOAD_RAMPS(f, f);
+	  break;
+	case -2:
+	  LOAD_RAMPS(d, d);
+	  break;
+	}
+  
   /* Done */
   rc = 0;
  done:
+#define RESTORE_RAMPS(SUFFIX, MEMBER) \
+  do \
+    if (outputs[i].saved_ramps.MEMBER.red != NULL) \
+      { \
+	gerror = libgamma_crtc_set_gamma_ramps##SUFFIX(outputs[i].crtc, outputs[i].saved_ramps.MEMBER); \
+	if (gerror) \
+	    libgamma_perror(argv0, gerror); \
+	libgamma_gamma_ramps##SUFFIX##_destroy(&(outputs[i].saved_ramps.MEMBER)); \
+      } \
+  while (0)
   if (crtcs != NULL)
     for (i = 0; i < crtcs_n; i++)
-      libgamma_crtc_destroy(crtcs + i);
+      {
+	if (outputs[i].supported != LIBGAMMA_NO)
+	  switch (outputs[i].depth)
+	    {
+	    case 8:
+	      RESTORE_RAMPS(8, u8);
+	      break;
+	    case 16:
+	      RESTORE_RAMPS(16, u16);
+	      break;
+	    case 32:
+	      RESTORE_RAMPS(32, u32);
+	      break;
+	    case 64:
+	      RESTORE_RAMPS(64, u64);
+		break;
+	    case -1:
+	      RESTORE_RAMPS(f, f);
+	      break;
+	    case -2:
+	      RESTORE_RAMPS(d, d);
+	      break;
+	    default:
+	      break; /* impossible */
+	    }
+	libgamma_crtc_destroy(crtcs + i);
+      }
   free(crtcs);
   if (partitions != NULL)
     for (i = 0; i < site.partitions_available; i++)
@@ -88,3 +231,4 @@ int main(int argc, char** argv)
   libgamma_perror(argv0, gerror);
   goto done;
 }
+
