@@ -40,7 +40,7 @@ char* argv0;
  * @param   crtc  libgamma's state for the CRTC
  * @return        The name of the CRTC, `NULL` on error
  */
-static char* getname(libgamma_crtc_information_t* info, libgamma_crtc_state_t* crtc)
+static char* get_name(libgamma_crtc_information_t* info, libgamma_crtc_state_t* crtc)
 {
   if ((info->edid_error == 0) && (info->edid != NULL))
     return libgamma_behex_edid(info->edid, info->edid_length);
@@ -125,7 +125,7 @@ int main(int argc, char** argv)
 	  outputs[i].green_size == 0 ||
 	  outputs[i].blue_size  == 0)
 	outputs[i].supported = 0;
-      outputs[i].name        = getname(&info, crtcs + i);
+      outputs[i].name        = get_name(&info, crtcs + i);
       saved_errno = errno;
       outputs[i].crtc        = crtcs + i;
       libgamma_crtc_information_destroy(&info);
