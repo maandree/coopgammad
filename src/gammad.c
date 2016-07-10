@@ -250,10 +250,8 @@ int main(int argc, char** argv)
       outputs[i].green_size  = info.gamma_size_error    ? 0 : info.green_gamma_size;
       outputs[i].blue_size   = info.gamma_size_error    ? 0 : info.blue_gamma_size;
       outputs[i].supported   = info.gamma_support_error ? 0 : info.gamma_support;
-      if (outputs[i].depth      == 0 ||
-	  outputs[i].red_size   == 0 ||
-	  outputs[i].green_size == 0 ||
-	  outputs[i].blue_size  == 0)
+      if (outputs[i].depth      == 0 || outputs[i].red_size  == 0 ||
+	  outputs[i].green_size == 0 || outputs[i].blue_size == 0)
 	outputs[i].supported = 0;
       outputs[i].name        = get_crtc_name(&info, crtcs + i);
       saved_errno = errno;
