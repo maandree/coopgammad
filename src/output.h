@@ -139,3 +139,15 @@ size_t output_marshal(const struct output* this, char* buf);
  */
 size_t output_unmarshal(struct output* this, const char* buf);
 
+/**
+ * Compare to outputs by the names of their respective CRTC:s
+ * 
+ * @param   a  Return -1 if this one is lower
+ * @param   b  Return +1 if this one is higher
+ * @return     See description of `a` and `b`,
+ *             0 if returned if they are the same
+ */
+#if defined(__GNUC__)
+__attribute__((pure))
+#endif
+int output_cmp_by_name(const void* a, const void* b);

@@ -35,6 +35,16 @@
  */
 char* argv0;
 
+/**
+ * Array of all outputs
+ */
+struct output* outputs = NULL;
+
+/**
+ * The nubmer of elements in `outputs`
+ */
+size_t outputs_n = 0;
+
 
 
 /**
@@ -179,8 +189,7 @@ int main(int argc, char** argv)
   libgamma_site_state_t site;
   libgamma_partition_state_t* partitions = NULL;
   libgamma_crtc_state_t* crtcs = NULL;
-  struct output* outputs = NULL;
-  size_t i, j, n, n0, crtcs_n = 0;
+  size_t i, j, n, n0;
   
   memset(&site, 0, sizeof(site));
   
@@ -220,12 +229,12 @@ int main(int argc, char** argv)
     {
       if ((gerror = libgamma_partition_initialise(partitions + i, &site, i)))
 	goto fail_libgamma;
-      crtcs_n += partitions[i].crtcs_available;
+      outputs_n += partitions[i].crtcs_available;
     }
   
   /* Get CRTC:s */
-  if (crtcs_n)
-    if (!(crtcs = calloc(crtcs_n, sizeof(*crtcs))))
+  if (outputs_n)
+    if (!(crtcs = calloc(outputs_n, sizeof(*crtcs))))
       goto fail;
   for (i = 0, j = n = 0; i < site.partitions_available; i++)
     for (n0 = n, n += partitions[i].crtcs_available; j < n; j++)
@@ -233,10 +242,10 @@ int main(int argc, char** argv)
 	goto fail_libgamma;
   
   /* Get CRTC information */
-  if (crtcs_n)
-    if (!(outputs = calloc(crtcs_n, sizeof(*outputs))))
+  if (outputs_n)
+    if (!(outputs = calloc(outputs_n, sizeof(*outputs))))
       goto fail;
-  for (i = 0; i < crtcs_n; i++)
+  for (i = 0; i < outputs_n; i++)
     {
       libgamma_crtc_information_t info;
       int saved_errno;
@@ -263,6 +272,10 @@ int main(int argc, char** argv)
       if (outputs[i].name == NULL)
 	goto fail;
     }
+  free(crtcs), crtcs = NULL;
+  
+  /* Sort outputs */
+  qsort(outputs, outputs_n, sizeof(*outputs), output_cmp_by_name);
   
   /* Load current gamma ramps */
 #define LOAD_RAMPS(SUFFIX, MEMBER) \
@@ -279,7 +292,7 @@ int main(int argc, char** argv)
 	} \
     } \
   while (0)
-  for (i = 0; i < crtcs_n; i++)
+  for (i = 0; i < outputs_n; i++)
     if (outputs[i].supported != LIBGAMMA_NO)
       switch (outputs[i].depth)
 	{
@@ -324,8 +337,8 @@ int main(int argc, char** argv)
 	    libgamma_perror(argv0, gerror); \
       } \
   while (0)
-  if (crtcs != NULL)
-    for (i = 0; i < crtcs_n; i++)
+  if (outputs != NULL)
+    for (i = 0; i < outputs_n; i++)
       {
 	if (outputs[i].supported != LIBGAMMA_NO)
 	  switch (outputs[i].depth)
@@ -351,8 +364,8 @@ int main(int argc, char** argv)
 	    default:
 	      break; /* impossible */
 	    }
+	libgamma_crtc_destroy(outputs[i].crtc + i);
 	output_destroy(outputs + i);
-	libgamma_crtc_destroy(crtcs + i);
       }
   free(crtcs);
   if (partitions != NULL)
