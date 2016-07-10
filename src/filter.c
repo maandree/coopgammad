@@ -89,7 +89,7 @@ size_t filter_marshal(const struct filter* this, char* buf, size_t ramps_size)
     {
       if (buf != NULL)
 	memcpy(buf + off, this->ramps, ramps_size);
-      off += n;
+      off += ramps_size;
     }
   
   return off;
@@ -116,10 +116,10 @@ size_t filter_unmarshal(struct filter* this, const char* buf, size_t ramps_size)
   this->class = NULL;
   this->ramps = NULL;
   
-  this->priority = *(int64_t*)(buf + off);
+  this->priority = *(const int64_t*)(buf + off);
   off += sizeof(int64_t);
   
-  this->lifespan = *(enum lifespan*)(buf + off);
+  this->lifespan = *(const enum lifespan*)(buf + off);
   off += sizeof(enum lifespan);
   
   if (nonnulls & 1)
@@ -142,7 +142,7 @@ size_t filter_unmarshal(struct filter* this, const char* buf, size_t ramps_size)
     {
       if (!(this->ramps = memdup(buf + off, ramps_size)))
 	goto fail;
-      off += n;
+      off += ramps_size;
     }
   
   return off;

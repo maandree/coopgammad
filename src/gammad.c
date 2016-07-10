@@ -70,7 +70,7 @@ int main(int argc, char** argv)
   struct output* outputs = NULL;
   size_t i, j, n, n0, crtcs_n = 0;
   
-  argv0 = argv[0];
+  argv0 = argc ? argv[0] : "gammad";
   
   memset(&site, 0, sizeof(site));
   

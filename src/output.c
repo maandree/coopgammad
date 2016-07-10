@@ -151,22 +151,22 @@ size_t output_unmarshal(struct output* this, const char* buf)
   this->crtc = NULL;
   this->name = NULL;
   
-  this->depth = *(signed*)(buf + off);
+  this->depth = *(const signed*)(buf + off);
   off += sizeof(signed);
   
-  this->red_size = *(size_t*)(buf + off);
+  this->red_size = *(const size_t*)(buf + off);
   off += sizeof(size_t);
   
-  this->green_size = *(size_t*)(buf + off);
+  this->green_size = *(const size_t*)(buf + off);
   off += sizeof(size_t);
   
-  this->blue_size = *(size_t*)(buf + off);
+  this->blue_size = *(const size_t*)(buf + off);
   off += sizeof(size_t);
   
-  this->ramps_size = *(size_t*)(buf + off);
+  this->ramps_size = *(const size_t*)(buf + off);
   off += sizeof(size_t);
   
-  this->supported = *(enum libgamma_decision*)(buf + off);
+  this->supported = *(const enum libgamma_decision*)(buf + off);
   off += sizeof(enum libgamma_decision);
   
   n = strlen(buf + off) + 1;
@@ -179,7 +179,7 @@ size_t output_unmarshal(struct output* this, const char* buf)
   if (n == 0)
     return 0;
   
-  this->table_size = this->table_alloc = *(size_t*)(buf + off);
+  this->table_size = this->table_alloc = *(const size_t*)(buf + off);
   off += sizeof(size_t);
   if (this->table_size > 0)
     {
