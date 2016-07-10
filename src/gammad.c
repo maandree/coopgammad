@@ -235,7 +235,8 @@ int main(int argc, char** argv)
   return rc;
   /* Fail */
  fail:
-  perror(argv0);
+  if (errno != 0)
+    perror(argv0);
   goto done;
  fail_libgamma:
   libgamma_perror(argv0, gerror);
