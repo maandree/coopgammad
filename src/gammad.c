@@ -325,6 +325,34 @@ int main(int argc, char** argv)
 	  break;
 	}
   
+  /* Preserve current gamma ramps at priority=0 if -p */
+  if (preserve)
+    for (i = 0; i < outputs_n; i++)
+      {
+	struct filter filter = {
+	  .client   = -1,
+	  .crtc     = NULL,
+	  .priority = 0,
+	  .class    = NULL,
+	  .lifespan = LIFESPAN_UNTIL_REMOVAL,
+	  .ramps    = NULL
+	};
+	outputs[i].table_filters = calloc(4, sizeof(*(outputs[i].table_filters)));
+	outputs[i].table_sums = calloc(4, sizeof(*(outputs[i].table_sums)));
+	outputs[i].table_alloc = 4;
+	outputs[i].table_size = 1;
+	filter.class = memdup(PKGNAME "::" COMMAND "::preserved", sizeof(PKGNAME "::" COMMAND "::preserved"));
+	if (filter.class == NULL)
+	  goto fail;
+	filter.ramps = memdup(outputs[i].saved_ramps.u8.red, outputs[i].ramps_size);
+	if (filter.ramps == NULL)
+	  goto fail;
+	outputs[i].table_filters[0] = filter;
+	COPY_RAMP_SIZES(&(outputs[i].table_sums[0].u8), outputs + i);
+	if (!gamma_ramps_unmarshal(outputs[i].table_sums, outputs[i].saved_ramps.u8.red, outputs[i].ramps_size))
+	  goto fail;
+      }
+  
   /* Done */
   rc = 0;
  done:

@@ -128,7 +128,7 @@ void output_destroy(struct output* this);
  *                needs to be
  * @return        The number of marshalled byte
  */
-size_t output_marshal(const struct output* this, char* buf);
+size_t output_marshal(const struct output* this, void* buf);
 
 /**
  * Unmarshal an output
@@ -137,7 +137,7 @@ size_t output_marshal(const struct output* this, char* buf);
  * @param   buf   Buffer with the marshalled output
  * @return        The number of unmarshalled bytes, 0 on error
  */
-size_t output_unmarshal(struct output* this, const char* buf);
+size_t output_unmarshal(struct output* this, const void* buf);
 
 /**
  * Compare to outputs by the names of their respective CRTC:s

@@ -51,7 +51,8 @@ struct filter
 {
   /**
    * The client that applied it. This need not be
-   * set unless `.lifespan == LIFESPAN_UNTIL_DEATH`.
+   * set unless `.lifespan == LIFESPAN_UNTIL_DEATH`
+   * and unless the process itself added this.
    * This is the file descriptor of the client's
    * connection.
    */
@@ -106,7 +107,7 @@ void filter_destroy(struct filter* this);
  * @param   ramps_size  The byte-size of `filter->ramps`
  * @return              The number of marshalled byte
  */
-size_t filter_marshal(const struct filter* this, char* buf, size_t ramps_size);
+size_t filter_marshal(const struct filter* this, void* buf, size_t ramps_size);
 
 /**
  * Unmarshal a filter
@@ -117,5 +118,5 @@ size_t filter_marshal(const struct filter* this, char* buf, size_t ramps_size);
  * @param   ramps_size  The byte-size of `filter->ramps`
  * @return              The number of unmarshalled bytes, 0 on error
  */
-size_t filter_unmarshal(struct filter* this, const char* buf, size_t ramps_size);
+size_t filter_unmarshal(struct filter* this, const void* buf, size_t ramps_size);
 

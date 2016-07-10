@@ -47,48 +47,49 @@ void filter_destroy(struct filter* this)
  * @param   ramps_size  The byte-size of `this->ramps`
  * @return              The number of marshalled byte
  */
-size_t filter_marshal(const struct filter* this, char* buf, size_t ramps_size)
+size_t filter_marshal(const struct filter* this, void* buf, size_t ramps_size)
 {
   size_t off = 0, n;
   char nonnulls = 0;
+  char* bs = buf;
   
-  if (buf != NULL)
+  if (bs != NULL)
     {
       if (this->crtc  != NULL)  nonnulls |= 1;
       if (this->class != NULL)  nonnulls |= 2;
       if (this->ramps != NULL)  nonnulls |= 4;
-      *(buf + off) = nonnulls;
+      *(bs + off) = nonnulls;
     }
   off += 1;
   
-  if (buf != NULL)
-    *(int64_t*)(buf + off) = this->priority;
+  if (bs != NULL)
+    *(int64_t*)(bs + off) = this->priority;
   off += sizeof(int64_t);
   
-  if (buf != NULL)
-    *(enum lifespan*)(buf + off) = this->lifespan;
+  if (bs != NULL)
+    *(enum lifespan*)(bs + off) = this->lifespan;
   off += sizeof(enum lifespan);
   
   if (this->crtc != NULL)
     {
       n = strlen(this->crtc) + 1;
-      if (buf != NULL)
-	memcpy(buf + off, this->crtc, n);
+      if (bs != NULL)
+	memcpy(bs + off, this->crtc, n);
       off += n;
     }
   
   if (this->class != NULL)
     {
       n = strlen(this->class) + 1;
-      if (buf != NULL)
-	memcpy(buf + off, this->class, n);
+      if (bs != NULL)
+	memcpy(bs + off, this->class, n);
       off += n;
     }
   
   if (this->ramps != NULL)
     {
-      if (buf != NULL)
-	memcpy(buf + off, this->ramps, ramps_size);
+      if (bs != NULL)
+	memcpy(bs + off, this->ramps, ramps_size);
       off += ramps_size;
     }
   
@@ -104,43 +105,44 @@ size_t filter_marshal(const struct filter* this, char* buf, size_t ramps_size)
  * @param   ramps_size  The byte-size of `this->ramps`
  * @return              The number of unmarshalled bytes, 0 on error
  */
-size_t filter_unmarshal(struct filter* this, const char* buf, size_t ramps_size)
+size_t filter_unmarshal(struct filter* this, const void* buf, size_t ramps_size)
 {
   size_t off = 0, n;
   char nonnulls = 0;
+  const char* bs = buf;
   
-  nonnulls = *(buf + off);
+  nonnulls = *(bs + off);
   off += 1;
   
   this->crtc  = NULL;
   this->class = NULL;
   this->ramps = NULL;
   
-  this->priority = *(const int64_t*)(buf + off);
+  this->priority = *(const int64_t*)(bs + off);
   off += sizeof(int64_t);
   
-  this->lifespan = *(const enum lifespan*)(buf + off);
+  this->lifespan = *(const enum lifespan*)(bs + off);
   off += sizeof(enum lifespan);
   
   if (nonnulls & 1)
     {
-      n = strlen(buf + off) + 1;
-      if (!(this->crtc = memdup(buf + off, n)))
+      n = strlen(bs + off) + 1;
+      if (!(this->crtc = memdup(bs + off, n)))
 	goto fail;
       off += n;
     }
   
   if (nonnulls & 2)
     {
-      n = strlen(buf + off) + 1;
-      if (!(this->class = memdup(buf + off, n)))
+      n = strlen(bs + off) + 1;
+      if (!(this->class = memdup(bs + off, n)))
 	goto fail;
       off += n;
     }
   
   if (nonnulls & 4)
     {
-      if (!(this->ramps = memdup(buf + off, ramps_size)))
+      if (!(this->ramps = memdup(bs + off, ramps_size)))
 	goto fail;
       off += ramps_size;
     }

@@ -40,7 +40,7 @@ extern char* argv0;
  * @param   ramps_size  The byte-size of ramps
  * @return              The number of marshalled byte
  */
-size_t gamma_ramps_marshal(const union gamma_ramps* this, char* buf, size_t ramps_size)
+size_t gamma_ramps_marshal(const union gamma_ramps* this, void* buf, size_t ramps_size)
 {
   if (buf != NULL)
     memcpy(buf, this->u8.red, ramps_size);
@@ -57,7 +57,7 @@ size_t gamma_ramps_marshal(const union gamma_ramps* this, char* buf, size_t ramp
  * @param   ramps_size  The byte-size of ramps
  * @return              The number of unmarshalled bytes, 0 on error
  */
-size_t gamma_ramps_unmarshal(union gamma_ramps* this, const char* buf, size_t ramps_size)
+size_t gamma_ramps_unmarshal(union gamma_ramps* this, const void* buf, size_t ramps_size)
 {
   size_t depth = ramps_size / (this->u8.red_size + this->u8.green_size + this->u8.blue_size);
   int r = 0;

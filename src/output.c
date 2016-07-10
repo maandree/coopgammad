@@ -88,49 +88,50 @@ void output_destroy(struct output* this)
  *                needs to be
  * @return        The number of marshalled byte
  */
-size_t output_marshal(const struct output* this, char* buf)
+size_t output_marshal(const struct output* this, void* buf)
 {
   size_t off = 0, i, n;
+  char* bs = buf;
   
-  if (buf != NULL)
-    *(signed*)(buf + off) = this->depth;
+  if (bs != NULL)
+    *(signed*)(bs + off) = this->depth;
   off += sizeof(signed);
   
-  if (buf != NULL)
-    *(size_t*)(buf + off) = this->red_size;
+  if (bs != NULL)
+    *(size_t*)(bs + off) = this->red_size;
   off += sizeof(size_t);
   
-  if (buf != NULL)
-    *(size_t*)(buf + off) = this->green_size;
+  if (bs != NULL)
+    *(size_t*)(bs + off) = this->green_size;
   off += sizeof(size_t);
   
-  if (buf != NULL)
-    *(size_t*)(buf + off) = this->blue_size;
+  if (bs != NULL)
+    *(size_t*)(bs + off) = this->blue_size;
   off += sizeof(size_t);
   
-  if (buf != NULL)
-    *(size_t*)(buf + off) = this->ramps_size;
+  if (bs != NULL)
+    *(size_t*)(bs + off) = this->ramps_size;
   off += sizeof(size_t);
   
-  if (buf != NULL)
-    *(enum libgamma_decision*)(buf + off) = this->supported;
+  if (bs != NULL)
+    *(enum libgamma_decision*)(bs + off) = this->supported;
   off += sizeof(enum libgamma_decision);
   
   n = strlen(this->name) + 1;
-  if (buf != NULL)
-    memcpy(buf + off, this->name, n);
+  if (bs != NULL)
+    memcpy(bs + off, this->name, n);
   off += n;
   
-  off += gamma_ramps_marshal(&(this->saved_ramps), buf ? buf + off : NULL, this->ramps_size);
+  off += gamma_ramps_marshal(&(this->saved_ramps), bs ? bs + off : NULL, this->ramps_size);
   
-  if (buf != NULL)
-    *(size_t*)(buf + off) = this->table_size;
+  if (bs != NULL)
+    *(size_t*)(bs + off) = this->table_size;
   off += sizeof(size_t);
   
   for (i = 0; i < this->table_size; i++)
     {
-      off +=      filter_marshal(this->table_filters + i, buf ? buf + off : NULL, this->ramps_size);
-      off += gamma_ramps_marshal(this->table_sums    + i, buf ? buf + off : NULL, this->ramps_size);
+      off +=      filter_marshal(this->table_filters + i, bs ? bs + off : NULL, this->ramps_size);
+      off += gamma_ramps_marshal(this->table_sums    + i, bs ? bs + off : NULL, this->ramps_size);
     }
   
   return off;
@@ -144,42 +145,43 @@ size_t output_marshal(const struct output* this, char* buf)
  * @param   buf   Buffer with the marshalled output
  * @return        The number of unmarshalled bytes, 0 on error
  */
-size_t output_unmarshal(struct output* this, const char* buf)
+size_t output_unmarshal(struct output* this, const void* buf)
 {
   size_t off = 0, i, n;
+  const char* bs = buf;
   
   this->crtc = NULL;
   this->name = NULL;
   
-  this->depth = *(const signed*)(buf + off);
+  this->depth = *(const signed*)(bs + off);
   off += sizeof(signed);
   
-  this->red_size = *(const size_t*)(buf + off);
+  this->red_size = *(const size_t*)(bs + off);
   off += sizeof(size_t);
   
-  this->green_size = *(const size_t*)(buf + off);
+  this->green_size = *(const size_t*)(bs + off);
   off += sizeof(size_t);
   
-  this->blue_size = *(const size_t*)(buf + off);
+  this->blue_size = *(const size_t*)(bs + off);
   off += sizeof(size_t);
   
-  this->ramps_size = *(const size_t*)(buf + off);
+  this->ramps_size = *(const size_t*)(bs + off);
   off += sizeof(size_t);
   
-  this->supported = *(const enum libgamma_decision*)(buf + off);
+  this->supported = *(const enum libgamma_decision*)(bs + off);
   off += sizeof(enum libgamma_decision);
   
-  n = strlen(buf + off) + 1;
-  this->name = memdup(buf + off, n);
+  n = strlen(bs + off) + 1;
+  this->name = memdup(bs + off, n);
   if (this->name == NULL)
     return 0;
   
-  off += n = gamma_ramps_unmarshal(&(this->saved_ramps), buf, this->ramps_size);
+  off += n = gamma_ramps_unmarshal(&(this->saved_ramps), bs, this->ramps_size);
   COPY_RAMP_SIZES(&(this->saved_ramps.u8), this);
   if (n == 0)
     return 0;
   
-  this->table_size = this->table_alloc = *(const size_t*)(buf + off);
+  this->table_size = this->table_alloc = *(const size_t*)(bs + off);
   off += sizeof(size_t);
   if (this->table_size > 0)
     {
@@ -193,11 +195,11 @@ size_t output_unmarshal(struct output* this, const char* buf)
   
   for (i = 0; i < this->table_size; i++)
     {
-      off += n = filter_unmarshal(this->table_filters + i, buf + off, this->ramps_size);
+      off += n = filter_unmarshal(this->table_filters + i, bs + off, this->ramps_size);
       if (n == 0)
 	return 0;
       COPY_RAMP_SIZES(&(this->table_sums[i].u8), this);
-      off += n = gamma_ramps_unmarshal(this->table_sums + i, buf + off, this->ramps_size);
+      off += n = gamma_ramps_unmarshal(this->table_sums + i, bs + off, this->ramps_size);
       if (n == 0)
 	return 0;
     }
