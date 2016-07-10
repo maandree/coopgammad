@@ -92,29 +92,30 @@ struct filter
  * Free all resources allocated to a filter.
  * The allocation of `filter` itself is not freed.
  * 
- * @param  filter  The filter.
+ * @param  this  The filter
  */
-void filter_destroy(struct filter* filter);
+void filter_destroy(struct filter* this);
 
 /**
- * Marshal a filter.
+ * Marshal a filter
  * 
- * @param   filter      The filter.
- * @param   buf         Output buffer for the marshalled filter.
+ * @param   this        The filter
+ * @param   buf         Output buffer for the marshalled filter,
  *                      `NULL` just measure how large the buffers
- *                      needs to be.
+ *                      needs to be
  * @param   ramps_size  The byte-size of `filter->ramps`
  * @return              The number of marshalled byte
  */
-size_t filter_marshal(const struct filter* filter, char* buf, size_t ramps_size);
+size_t filter_marshal(const struct filter* this, char* buf, size_t ramps_size);
 
 /**
- * Unmarshal a filter.
+ * Unmarshal a filter
  * 
- * @param   filter      Output for the filter, `NULL` to skip unmarshalling
+ * @param   this        Output for the filter, `.red_size`, `.green_size`,
+ *                      and `.blue_size` must already be set
  * @param   buf         Buffer with the marshalled filter
  * @param   ramps_size  The byte-size of `filter->ramps`
  * @return              The number of unmarshalled bytes, 0 on error
  */
-size_t filter_unmarshal(struct filter* filter, const char* buf, size_t ramps_size);
+size_t filter_unmarshal(struct filter* this, const char* buf, size_t ramps_size);
 

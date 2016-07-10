@@ -194,7 +194,6 @@ int main(int argc, char** argv)
 	gerror = libgamma_crtc_set_gamma_ramps##SUFFIX(outputs[i].crtc, outputs[i].saved_ramps.MEMBER); \
 	if (gerror) \
 	    libgamma_perror(argv0, gerror); \
-	libgamma_gamma_ramps##SUFFIX##_destroy(&(outputs[i].saved_ramps.MEMBER)); \
       } \
   while (0)
   if (crtcs != NULL)
@@ -224,6 +223,7 @@ int main(int argc, char** argv)
 	    default:
 	      break; /* impossible */
 	    }
+	output_destroy(outputs + i);
 	libgamma_crtc_destroy(crtcs + i);
       }
   free(crtcs);

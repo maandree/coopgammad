@@ -56,3 +56,27 @@ union gamma_ramps
   libgamma_gamma_rampsd_t d;
 };
 
+
+
+/**
+ * Marshal a ramp trio
+ * 
+ * @param   this        The ramps
+ * @param   buf         Output buffer for the marshalled ramps,
+ *                      `NULL` just measure how large the buffers
+ *                      needs to be
+ * @param   ramps_size  The byte-size of ramps
+ * @return              The number of marshalled byte
+ */
+size_t gamma_ramps_marshal(const union gamma_ramps* this, char* buf, size_t ramps_size);
+
+/**
+ * Unmarshal a ramp trio
+ * 
+ * @param   this        Output for the ramps
+ * @param   buf         Buffer with the marshalled ramps
+ * @param   ramps_size  The byte-size of ramps
+ * @return              The number of unmarshalled bytes, 0 on error
+ */
+size_t gamma_ramps_unmarshal(union gamma_ramps* this, const char* buf, size_t ramps_size);
+

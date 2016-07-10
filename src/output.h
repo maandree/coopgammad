@@ -20,6 +20,23 @@
 #include <libgamma.h>
 
 #include "ramps.h"
+#include "filter.h"
+
+
+
+/**
+ * Copy the ramp sizes
+ * 
+ * This macro supports both `struct output`
+ * and `struct gamma_ramps`
+ * 
+ * @param  dest  The destination
+ * @param  src   The source
+ */
+#define COPY_RAMP_SIZES(dest, src)         \
+  ((dest)->red_size   = (src)->red_size,   \
+   (dest)->green_size = (src)->green_size, \
+   (dest)->blue_size  = (src)->blue_size)
 
 
 
@@ -85,5 +102,40 @@ struct output
    * Saved gamma ramps
    */
   union gamma_ramps saved_ramps;
+  
+  struct filter* table_filters;
+  union gamma_ramps* table_sums;
+  size_t table_alloc;
+  size_t table_size;
 };
+
+
+
+/**
+ * Free all resources allocated to an output.
+ * The allocation of `output` itself is not freed.
+ * 
+ * @param  this  The output
+ */
+void output_destroy(struct output* this);
+
+/**
+ * Marshal an output
+ * 
+ * @param   this  The output
+ * @param   buf   Output buffer for the marshalled output,
+ *                `NULL` just measure how large the buffers
+ *                needs to be
+ * @return        The number of marshalled byte
+ */
+size_t output_marshal(const struct output* this, char* buf);
+
+/**
+ * Unmarshal an output
+ * 
+ * @param   this  Output for the output
+ * @param   buf   Buffer with the marshalled output
+ * @return        The number of unmarshalled bytes, 0 on error
+ */
+size_t output_unmarshal(struct output* this, const char* buf);
 
