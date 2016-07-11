@@ -3,7 +3,7 @@ COMMAND = gammad
 
 KERNEL = $(shell uname | tr '[A-Z]_' '[a-z]-')
 
-SRC = filter gammad output ramps util message
+SRC = filter gammad output ramps util message server
 
 OPTIMISE = -Og -g
 

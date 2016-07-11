@@ -33,6 +33,7 @@
 #include "arg.h"
 #include "output.h"
 #include "util.h"
+#include "server.h"
 
 
 
@@ -452,6 +453,7 @@ int main(int argc, char** argv)
   char* pidpath = NULL;
   char* socketpath = NULL;
   sigset_t mask;
+  int init_stage = 0;
   
   memset(&site, 0, sizeof(site));
   
@@ -686,6 +688,11 @@ int main(int argc, char** argv)
   if (signal(SIGTERM, sig_terminate) == SIG_ERR)
     goto fail;
   
+  /* Initialise the server */
+  if (server_initialise() < 0)
+    goto fail;
+  init_stage++;
+  
   /* Place in the background unless -f */
   if (foreground == 0)
     {
@@ -781,6 +788,8 @@ int main(int argc, char** argv)
   /* Done */
   rc = 0;
  done:
+  if (init_stage >= 1)
+    server_destroy(1);
   if (socketfd >= 0)
     {
       shutdown(socketfd, SHUT_RDWR);
