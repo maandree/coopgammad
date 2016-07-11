@@ -868,7 +868,7 @@ static void destroy(void)
  */
 static void usage(void)
 {
-  printf("Usage: %s [-m method] [-s site] [-p]\n", argv0);
+  printf("Usage: %s [-m method] [-s site] [-kfp]\n", argv0);
   exit(1);
 }
 
