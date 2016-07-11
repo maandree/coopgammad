@@ -229,9 +229,13 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
   int fd = -1, saved_errno, tries = 0;
   char* content = NULL;
   char* p;
-  char* end;
   pid_t pid = 0;
   size_t n;
+#if defined(HAVE_LINUX_PROCFS)
+  char* end;
+#else
+  (void) token;
+#endif
   
   /* Get PID */
  retry:
@@ -271,6 +275,7 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
     goto bad;
   
   /* Validate PID */
+#if defined(HAVE_LINUX_PROCFS)
   sprintf(temp, "/proc/%llu/environ", (unsigned long long)pid);
   fd = open(temp, O_RDONLY);
   if (fd < 0)
@@ -283,6 +288,10 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
   for (end = (p = content) + n; p != end; p = strchr(p, '\0') + 1)
     if (!strcmp(p, token))
       return 0;
+#else
+  if ((kill(pid, 0) == 0) || (errno == EINVAL))
+    return 0;
+#endif
   
   return 1;
  bad:

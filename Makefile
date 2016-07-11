@@ -1,6 +1,7 @@
 PKGNAME = gammad
-COMmAND = gammad
+COMMAND = gammad
 
+KERNEL = linux
 
 SRC = filter gammad output ramps util
 
@@ -18,9 +19,12 @@ WARN = -Wall -Wextra -pedantic -Wdouble-promotion -Wformat=2 -Winit-self -Wmissi
 FFLAGS = -fstrict-aliasing -fstrict-overflow -fipa-pure-const -ftree-vrp -fstack-usage \
          -funsafe-loop-optimizations
 
+CPP_linux = -DHAVE_LINUX_PROCFS
+CPP_linux-libre = $(CPP_linux)
+
 CCFLAGS = -std=c99 $(WARN) $(FFLAGS) $(OPTIMISE)
 LDFLAGS = $(OPTIMISE) -lgamma
-CPPFLAGS = -D'PKGNAME="$(PKGNAME)"' -D'COMMAND="$(COMMAND)"' -D_XOPEN_SOURCE=700
+CPPFLAGS = -D'PKGNAME="$(PKGNAME)"' -D'COMMAND="$(COMMAND)"' -D_XOPEN_SOURCE=700 $(CPP_$(KERNEL))
 
 
 .PHONY: all
