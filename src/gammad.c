@@ -294,7 +294,8 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
  * Create PID file
  * 
  * @param   pidfile  The pathname of the PID file
- * @return           Zero on success, -1 on error
+ * @return           Zero on success, -1 on error,
+ *                   -2 if the service is already running
  */
 static int create_pidfile(char* pidfile)
 {
@@ -340,7 +341,7 @@ static int create_pidfile(char* pidfile)
 	goto fail;
       fprintf(stderr, "%s: service is already running\n", argv0);
       errno = 0;
-      return -1;
+      return -2;
     }
   
   /* Write PID to PID file. */
@@ -371,9 +372,14 @@ static void usage(void)
 }
 
 
+/**
+ * @return  0: Successful
+ *          1: An error occurred
+ *          2: Already running
+ */
 int main(int argc, char** argv)
 {
-  int method = -1, gerror, rc = 1, preserve = 0;
+  int method = -1, gerror, rc = 1, preserve = 0, r;
   char* sitename = NULL;
   libgamma_site_state_t site;
   libgamma_partition_state_t* partitions = NULL;
@@ -419,9 +425,10 @@ int main(int argc, char** argv)
     goto fail;
   
   /* Create PID file */
-  if (create_pidfile(pidpath) < 0)
+  if ((r = create_pidfile(pidpath)) < 0)
     {
       free(pidpath), pidpath = NULL;
+      rc = -r;
       goto fail;
     }
   
