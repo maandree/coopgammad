@@ -373,6 +373,10 @@ static void usage(void)
 
 
 /**
+ * Must not be started without stdout or stderr (may be /dev/null)
+ * 
+ * The process closes stdout when the socket has been created
+ * 
  * @return  0: Successful
  *          1: An error occurred
  *          2: Already running
@@ -431,6 +435,15 @@ int main(int argc, char** argv)
       rc = -r;
       goto fail;
     }
+  
+  /* TODO socket */
+  
+  /* Signal the spawner that the service is ready */
+  close(STDOUT_FILENO);
+  /* Avoid potential catastrophes that would occur if a library that is being
+   * used was so mindless as to write to stdout. */
+  if (dup2(STDERR_FILENO, STDOUT_FILENO) < 0)
+    perror(argv0);
   
   /* Get partitions */
   if (site.partitions_available)
