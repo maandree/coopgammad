@@ -56,6 +56,44 @@ size_t outputs_n = 0;
  */
 int socketfd = -1;
 
+/**
+ * Has the process receive a signal
+ * telling it to re-execute?
+ */
+volatile sig_atomic_t reexec = 0;
+
+/**
+ * Has the process receive a signal
+ * telling it to terminate?
+ */
+volatile sig_atomic_t terminate = 0;
+
+
+
+/**
+ * Called when the process receives
+ * a signal telling it to re-execute
+ * 
+ * @param  signo The received signal
+ */
+static void sig_reexec(int signo)
+{
+  reexec = 1;
+  (void) signo;
+}
+
+
+/**
+ * Called when the process receives
+ * a signal telling it to terminate
+ * 
+ * @param  signo The received signal
+ */
+static void sig_terminate(int signo)
+{
+  terminate = 1;
+  (void) signo;
+}
 
 
 /**
@@ -310,6 +348,9 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
 
 /**
  * Create PID file
+ * 
+ * @signal  SIGUSR1  Re-execute to updated process image
+ * @signal  SIGTERM  Terminate the process gracefully
  * 
  * @param   pidfile  The pathname of the PID file
  * @return           Zero on success, -1 on error,
@@ -635,9 +676,15 @@ int main(int argc, char** argv)
       goto fail;
   }
   
-  /* Change directory to / to avoid blocking umounting. */
+  /* Change directory to / to avoid blocking umounting */
   if (chdir("/") < 0)
     perror(argv0);
+  
+  /* Set up signal handlers */
+  if (signal(SIGUSR1, sig_reexec) == SIG_ERR)
+    goto fail;
+  if (signal(SIGTERM, sig_terminate) == SIG_ERR)
+    goto fail;
   
   /* Place in the background unless -f */
   if (foreground == 0)
