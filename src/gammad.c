@@ -94,11 +94,11 @@ static char* get_socket_pathname(libgamma_site_state_t* site)
   if ((pw = getpwuid(getuid())))
     username = pw->pw_name ? pw->pw_name : "";
   
-  n = sizeof("%s/.gammad/~%s/%i%s%s") + 3 * sizeof(int);
+  n = sizeof("%s/.gammad/~%s/%i%s%s.socket") + 3 * sizeof(int);
   n += strlen(rundir) + strlen(username) + strlen(name);
   if (!(rc = malloc(n)))
     goto fail;
-  sprintf(rc, "%s/.gammad/~%s/%i%s%s",
+  sprintf(rc, "%s/.gammad/~%s/%i%s%s.socket",
 	  rundir, username, site->method, name ? "." : "", name ? name : "");
   return rc;
   
