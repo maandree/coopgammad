@@ -17,6 +17,7 @@
  */
 #include <libgamma.h>
 
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -430,7 +431,16 @@ int main(int argc, char** argv)
   if (argc > 0)
     usage();
   
-  /* TODO Close all file descriptors above stderr */
+  /* Close all file descriptors above stderr */
+  {
+    struct rlimit rlimit;
+    if (getrlimit(RLIMIT_NOFILE, &rlimit) || (rlimit.rlim_cur == RLIM_INFINITY))
+      n = 4 << 10;
+    else
+      n = (size_t)(rlimit.rlim_cur);
+    for (i = STDERR_FILENO + 1; i < n; i++)
+      close((int)i);
+  }
   
   /* Set umask, reset signal handlers, and reset signal mask */
   umask(0);
