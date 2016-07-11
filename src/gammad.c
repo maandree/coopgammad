@@ -17,15 +17,17 @@
  */
 #include <libgamma.h>
 
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/un.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pwd.h>
-#include <stdlib.h>
+#include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <signal.h>
 
 #include "arg.h"
 #include "output.h"
@@ -47,6 +49,11 @@ struct output* outputs = NULL;
  * The nubmer of elements in `outputs`
  */
 size_t outputs_n = 0;
+
+/**
+ * The server socket's file descriptor
+ */
+int socketfd = -1;
 
 
 
@@ -239,7 +246,7 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
     {
       if (++tries > 1)
 	goto bad;
-      usleep(100000); /* 1 tenth of a second */ /* TODO replace with nanosleep */
+      msleep(100); /* 1 tenth of a second */
       goto retry;
     }
   
@@ -588,7 +595,26 @@ int main(int argc, char** argv)
 	  goto fail;
       }
   
-  /* TODO socket */
+  /* Create socket and start listening */
+  {
+    struct sockaddr_un address;
+    address.sun_family = AF_UNIX;
+    if (strlen(socketpath) >= sizeof(address.sun_path))
+      {
+	errno = ENAMETOOLONG;
+	goto fail;
+      }
+    strcpy(address.sun_path, socketpath);
+    unlink(socketpath);
+    if ((socketfd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
+      goto fail;
+    if (fchmod(socketfd, S_IRWXU) < 0)
+      goto fail;
+    if (bind(socketfd, (struct sockaddr*)(&address), sizeof(address)) < 0)
+      goto fail;
+    if (listen(socketfd, SOMAXCONN) < 0)
+      goto fail;
+  }
   
   /* Change directory to / to avoid blocking umounting. */
   if (chdir("/") < 0)
@@ -689,6 +715,12 @@ int main(int argc, char** argv)
   /* Done */
   rc = 0;
  done:
+  if (socketfd >= 0)
+    {
+      shutdown(socketfd, SHUT_RDWR);
+      close(socketfd);
+      unlink(socketpath);
+    }
 #define RESTORE_RAMPS(SUFFIX, MEMBER) \
   do \
     if (outputs[i].saved_ramps.MEMBER.red != NULL) \

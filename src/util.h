@@ -52,3 +52,14 @@ void* nread(int fd, size_t* n);
  */
 int dup2atleast(int fd, int atleast);
 
+
+/**
+ * Perform a timed suspention of the process.
+ * The process resumes when the timer expires,
+ * or when it is interrupted.
+ * 
+ * @param  ms  The number of milliseconds to sleep,
+ *             must be less than 1000
+ */
+void msleep(int ms);
+

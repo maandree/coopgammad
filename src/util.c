@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 
@@ -131,5 +132,23 @@ int dup2atleast(int fd, int atleast)
   free(stack);
   errno = saved_errno;
   return new;
+}
+
+
+/**
+ * Perform a timed suspention of the process.
+ * The process resumes when the timer expires,
+ * or when it is interrupted.
+ * 
+ * @param  ms  The number of milliseconds to sleep,
+ *             must be less than 1000
+ */
+void msleep(int ms)
+{
+  struct timespec ts;
+  ts.tv_sec = 0;
+  ts.tv_nsec = (long)ms * 1000000L;
+  if (clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, NULL) == ENOTSUP)
+    nanosleep(&ts, NULL);
 }
 
