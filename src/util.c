@@ -96,3 +96,40 @@ void* nread(int fd, size_t* n)
   return NULL;
 }
 
+
+/**
+ * Duplicate a file descriptor an make sure
+ * the new file descriptor's index as a
+ * specified minimum value
+ * 
+ * @param   fd       The file descriptor
+ * @param   atleast  The least acceptable new file descriptor
+ * @return           The new file descriptor, -1 on error
+ */
+int dup2atleast(int fd, int atleast)
+{
+  int* stack = malloc((size_t)(atleast + 1) * sizeof(int));
+  size_t stack_ptr = 0;
+  int new = -1, saved_errno;
+  
+  if (stack == NULL)
+    goto fail;
+  
+  for (;;)
+    {
+      new = dup(fd);
+      if (new < 0)
+	goto fail;
+      if (new >= atleast)
+	break;
+    }
+  
+ fail:
+  saved_errno = errno;
+  while (stack_ptr--)
+    close(stack[stack_ptr]);
+  free(stack);
+  errno = saved_errno;
+  return new;
+}
+

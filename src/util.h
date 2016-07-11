@@ -40,3 +40,15 @@ void* memdup(const void* src, size_t n);
  */
 void* nread(int fd, size_t* n);
 
+
+/**
+ * Duplicate a file descriptor an make sure
+ * the new file descriptor's index as a
+ * specified minimum value
+ * 
+ * @param   fd       The file descriptor
+ * @param   atleast  The least acceptable new file descriptor
+ * @return           The new file descriptor, -1 on error
+ */
+int dup2atleast(int fd, int atleast);
+

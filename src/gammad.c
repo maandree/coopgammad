@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "arg.h"
 #include "output.h"
@@ -238,7 +239,7 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
     {
       if (++tries > 1)
 	goto bad;
-      usleep(100000); /* 1 tenth of a second */
+      usleep(100000); /* 1 tenth of a second */ /* TODO replace with nanosleep */
       goto retry;
     }
   
@@ -373,7 +374,7 @@ static void usage(void)
 
 
 /**
- * Must not be started without stdout or stderr (may be /dev/null)
+ * Must not be started without stdin, stdout, or stderr (may be /dev/null)
  * 
  * The process closes stdout when the socket has been created
  * 
@@ -383,7 +384,8 @@ static void usage(void)
  */
 int main(int argc, char** argv)
 {
-  int method = -1, gerror, rc = 1, preserve = 0, r;
+  int method = -1, gerror, rc = 1, preserve = 0, foreground = 0, r;
+  int keep_stderr = 0;
   char* sitename = NULL;
   libgamma_site_state_t site;
   libgamma_partition_state_t* partitions = NULL;
@@ -391,6 +393,7 @@ int main(int argc, char** argv)
   size_t i, j, n, n0;
   char* pidpath = NULL;
   char* socketpath = NULL;
+  sigset_t mask;
   
   memset(&site, 0, sizeof(site));
   
@@ -407,12 +410,29 @@ int main(int argc, char** argv)
     case 'p':
       preserve = 1;
       break;
+    case 'f':
+      foreground = 1;
+      break;
+    case 'k':
+      keep_stderr = 1;
+      break;
     default:
       usage();
     }
   ARGEND;
   if (argc > 0)
     usage();
+  
+  /* TODO Close all file descriptors above stderr */
+  
+  /* Set umask, reset signal handlers, and reset signal mask */
+  umask(0);
+  for (r = 1; r < _NSIG; r++)
+    signal(r, SIG_DFL);
+  if (sigfillset(&mask))
+    perror(argv0);
+  else
+    sigprocmask(SIG_UNBLOCK, &mask, NULL);
   
   /* Get method */
   if ((method < 0) && (libgamma_list_methods(&method, 1, 0) < 1))
@@ -435,15 +455,6 @@ int main(int argc, char** argv)
       rc = -r;
       goto fail;
     }
-  
-  /* TODO socket */
-  
-  /* Signal the spawner that the service is ready */
-  close(STDOUT_FILENO);
-  /* Avoid potential catastrophes that would occur if a library that is being
-   * used was so mindless as to write to stdout. */
-  if (dup2(STDERR_FILENO, STDOUT_FILENO) < 0)
-    perror(argv0);
   
   /* Get partitions */
   if (site.partitions_available)
@@ -576,6 +587,104 @@ int main(int argc, char** argv)
 	if (!gamma_ramps_unmarshal(outputs[i].table_sums, outputs[i].saved_ramps.u8.red, outputs[i].ramps_size))
 	  goto fail;
       }
+  
+  /* TODO socket */
+  
+  /* Change directory to / to avoid blocking umounting. */
+  if (chdir("/") < 0)
+    perror(argv0);
+  
+  /* Place in the background unless -f */
+  if (foreground == 0)
+    {
+      pid_t pid;
+      int fd = -1, saved_errno;
+      int notify_rw[2] = { -1, -1 };
+      char a_byte = 0;
+      ssize_t got;
+      
+      if (pipe(notify_rw) < 0)
+	goto fail;
+      if (notify_rw[0] <= STDERR_FILENO)
+	if ((notify_rw[0] = dup2atleast(notify_rw[0], STDERR_FILENO + 1)) < 0)
+	  goto fail_background;
+      if (notify_rw[1] <= STDERR_FILENO)
+	if ((notify_rw[1] = dup2atleast(notify_rw[1], STDERR_FILENO + 1)) < 0)
+	  goto fail_background;
+      
+      switch ((pid = fork()))
+	{
+	case -1:
+	  goto fail_background;
+	case 0:
+	  /* Child */
+	  close(notify_rw[0]), notify_rw[0] = -1;
+	  if (setsid() < 0)
+	    goto fail_background;
+	  switch ((pid = fork()))
+	    {
+	    case -1:
+	      goto fail_background;
+	    case 0:
+	      /* Replace std* with /dev/null */
+	      fd = open("/dev/null", O_RDWR);
+	      if (fd < 0)
+		goto fail;
+#define xdup2(s, d)  do if (s != d) { close(d); if (dup2(s, d) < 0) goto fail; } while (0)
+	      xdup2(fd, STDIN_FILENO);
+	      xdup2(fd, STDOUT_FILENO);
+	      if (keep_stderr)
+		xdup2(fd, STDERR_FILENO);
+	      if (fd > STDERR_FILENO)
+		close(fd);
+	      fd = -1;
+	      
+	      /* Update PID file */
+	      fd = open(pidpath, O_WRONLY);
+	      if (fd < 0)
+		goto fail_background;
+	      if (dprintf(fd, "%llu\n", (unsigned long long)getpid()) < 0)
+		goto fail_background;
+	      close(fd), fd = -1;
+	      
+	      /* Notify */
+	      if (write(notify_rw[1], &a_byte, 1) <= 0)
+		goto fail_background;
+	      close(notify_rw[1]);
+	      break;
+	    default:
+	      /* Parent */
+	      return 0;
+	    }
+	  break;
+	default:
+	  /* Parent */
+	  close(notify_rw[1]), notify_rw[1] = -1;
+	  got = read(notify_rw[0], &a_byte, 1);
+	  if (got < 0)
+	    goto fail_background;
+	  close(notify_rw[0]);
+	  return got == 0;
+	}
+      
+      goto done_background;
+    fail_background:
+      saved_errno = errno;
+      if (fd >= 0)            close(fd);
+      if (notify_rw[0] >= 0)  close(notify_rw[0]);
+      if (notify_rw[1] >= 0)  close(notify_rw[1]);
+      errno = saved_errno;
+    done_background:;
+    }
+  else
+    {
+      /* Signal the spawner that the service is ready */
+      close(STDOUT_FILENO);
+      /* Avoid potential catastrophes that would occur if a library that is being
+       * used was so mindless as to write to stdout. */
+      if (dup2(STDERR_FILENO, STDOUT_FILENO) < 0)
+	perror(argv0);
+    }
   
   /* Done */
   rc = 0;
