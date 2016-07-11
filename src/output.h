@@ -103,10 +103,32 @@ struct output
    */
   union gamma_ramps saved_ramps;
   
+  /**
+   * The table of all applied filters
+   */
   struct filter* table_filters;
+  
+  /**
+   * `.table_sums[i]` is the resulting
+   * adjustment made when all filter
+   * from `.table_filters[0]` up to and
+   * including `.table_filters[i]` has
+   * been applied
+   */
   union gamma_ramps* table_sums;
+  
+  /**
+   * The number of elements allocated
+   * for `.table_filters` and for `.table_sums`
+   */
   size_t table_alloc;
+  
+  /**
+   * The number of elements stored in
+   * `.table_filters` and in `.table_sums`
+   */
   size_t table_size;
+  
 };
 
 

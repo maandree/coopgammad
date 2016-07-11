@@ -41,6 +41,7 @@ enum lifespan
    * The filter should be removed now
    */
   LIFESPAN_REMOVE
+  
 };
 
 
@@ -85,6 +86,7 @@ struct filter
    * `lifespan == LIFESPAN_REMOVE`.
    */
   void* ramps;
+  
 };
 
 

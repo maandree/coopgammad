@@ -63,3 +63,16 @@ int dup2atleast(int fd, int atleast);
  */
 void msleep(int ms);
 
+
+/**
+ * Check whether a NUL-terminated string is encoded in UTF-8
+ * 
+ * @param   string              The string
+ * @param   allow_modified_nul  Whether Modified UTF-8 is allowed, which allows a two-byte encoding for NUL
+ * @return                      Zero if good, -1 on encoding error
+ */
+#if defined(__GNUC__)
+__attribute__((pure))
+#endif
+int verify_utf8(const char* string, int allow_modified_nul);
+

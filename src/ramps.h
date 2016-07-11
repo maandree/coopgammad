@@ -54,6 +54,7 @@ union gamma_ramps
    * Ramps with `double` value
    */
   libgamma_gamma_rampsd_t d;
+  
 };
 
 
