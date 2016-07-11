@@ -43,6 +43,12 @@
 char* argv0;
 
 /**
+ * The real pathname of the process's binary,
+ * `NULL` if `argv0` is satisfactory
+ */
+char* argv0_real = NULL;
+
+/**
  * Array of all outputs
  */
 struct output* outputs = NULL;
@@ -674,6 +680,12 @@ static int initialise(int method, const char *sitename, int preserve, int foregr
   if (listen(socketfd, SOMAXCONN) < 0)
     goto fail;
   
+  /* Get the real pathname of the process's binary, in case
+   * it is relative, so we can re-execute without problem. */
+  if ((*argv0 != '/') && strchr(argv0, '/'))
+    if (!(argv0_real = realpath(argv0, NULL)))
+      goto fail;
+  
   /* Change directory to / to avoid blocking umounting */
   if (chdir("/") < 0)
     perror(argv0);
@@ -860,6 +872,7 @@ static void destroy(void)
   if (pidpath)
     unlink(pidpath);
   free(pidpath);
+  free(argv0_real);
 }
 
 
@@ -875,6 +888,9 @@ static void usage(void)
 
 /**
  * Must not be started without stdin, stdout, or stderr (may be /dev/null)
+ * 
+ * argv[0] must refer to the real command name or pathname,
+ * otherwise, re-execute will not work
  * 
  * The process closes stdout when the socket has been created
  * 
