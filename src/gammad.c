@@ -217,7 +217,7 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
   /* PORTERS: /proc/$PID/environ is Linux specific */
   
   char temp[sizeof("/proc//environ") + 3 * sizeof(pid_t)];
-  int fd = -1, saved_errno;
+  int fd = -1, saved_errno, tries = 0;
   char* content = NULL;
   char* p;
   char* end;
@@ -225,6 +225,7 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
   size_t n;
   
   /* Get PID */
+ retry:
   fd = open(pidfile, O_RDONLY);
   if (fd < 0)
     return -1;
@@ -232,6 +233,14 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
   if (content == NULL)
     goto fail;
   close(fd), fd = -1;
+  
+  if (n == 0)
+    {
+      if (++tries > 1)
+	goto bad;
+      usleep(100000); /* 1 tenth of a second */
+      goto retry;
+    }
   
   if (('0' > content[0]) || (content[0] > '9'))
     goto bad;
