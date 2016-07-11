@@ -881,9 +881,21 @@ static void usage(void)
  * @signal  SIGUSR1  Re-execute to updated process image
  * @signal  SIGTERM  Terminate the process gracefully
  * 
- * @return  0: Successful
- *          1: An error occurred
- *          2: Already running
+ * @param   argc  The number of elements in `argv`
+ * @param   argv  Command line arguments. Recognised options:
+ *                  -s SITENAME
+ *                    The site to which to connect
+ *                  -m METHOD
+ *                    Adjustment method name or adjustment method number
+ *                  -p
+ *                    Preserve current gamma ramps at priority 0
+ *                  -f
+ *                    Do not fork the process into the background
+ *                  -k
+ *                    Keep stderr open
+ * @return        0: Successful
+ *                1: An error occurred
+ *                2: Already running
  */
 int main(int argc, char** argv)
 {
