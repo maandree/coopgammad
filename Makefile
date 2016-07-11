@@ -1,7 +1,7 @@
 PKGNAME = gammad
 COMMAND = gammad
 
-KERNEL = linux
+KERNEL = $(shell uname | tr '[A-Z]_' '[a-z]-')
 
 SRC = filter gammad output ramps util
 
