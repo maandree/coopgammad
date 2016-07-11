@@ -385,9 +385,6 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
 /**
  * Create PID file
  * 
- * @signal  SIGUSR1  Re-execute to updated process image
- * @signal  SIGTERM  Terminate the process gracefully
- * 
  * @param   pidfile  The pathname of the PID file
  * @return           Zero on success, -1 on error,
  *                   -2 if the service is already running
@@ -880,6 +877,9 @@ static void usage(void)
  * Must not be started without stdin, stdout, or stderr (may be /dev/null)
  * 
  * The process closes stdout when the socket has been created
+ * 
+ * @signal  SIGUSR1  Re-execute to updated process image
+ * @signal  SIGTERM  Terminate the process gracefully
  * 
  * @return  0: Successful
  *          1: An error occurred
