@@ -2,7 +2,7 @@ PKGNAME = gammad
 COMmAND = gammad
 
 
-SRC = filter gammad output ramps
+SRC = filter gammad output ramps util
 
 OPTIMISE = -Og -g
 
@@ -20,7 +20,7 @@ FFLAGS = -fstrict-aliasing -fstrict-overflow -fipa-pure-const -ftree-vrp -fstack
 
 CCFLAGS = -std=c99 $(WARN) $(FFLAGS) $(OPTIMISE)
 LDFLAGS = $(OPTIMISE) -lgamma
-CPPFLAGS = -D'PKGNAME="$(PKGNAME)"' -D'COMMAND="$(COMMAND)"'
+CPPFLAGS = -D'PKGNAME="$(PKGNAME)"' -D'COMMAND="$(COMMAND)"' -D_XOPEN_SOURCE=700
 
 
 .PHONY: all

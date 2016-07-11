@@ -17,7 +17,9 @@
  */
 #include <libgamma.h>
 
+#include <sys/stat.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <pwd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -63,6 +65,7 @@ static char* get_pathname(libgamma_site_state_t* site, const char* suffix)
   char* rc;
   struct passwd* pw;
   size_t n;
+  int saved_errno;
   
   if (site->site)
     {
@@ -104,7 +107,9 @@ static char* get_pathname(libgamma_site_state_t* site, const char* suffix)
   return rc;
   
  fail:
+  saved_errno = errno;
   free(name);
+  errno = saved_errno;
   return NULL;
 }
 
@@ -198,6 +203,156 @@ static char* get_crtc_name(libgamma_crtc_information_t* info, libgamma_crtc_stat
 
 
 /**
+ * Check whether a PID file is outdated
+ * 
+ * @param   pidfile  The PID file
+ * @param   token    An environment variable (including both key and value)
+ *                   that must exist in the process if it is a gammad process
+ * @return           -1: An error occurred
+ *                    0: The service is already running
+ *                    1: The PID file is outdated
+ */
+static int is_pidfile_reusable(const char* pidfile, const char* token)
+{
+  /* PORTERS: /proc/$PID/environ is Linux specific */
+  
+  char temp[sizeof("/proc//environ") + 3 * sizeof(pid_t)];
+  int fd = -1, saved_errno;
+  char* content = NULL;
+  char* p;
+  char* end;
+  pid_t pid = 0;
+  size_t n;
+  
+  /* Get PID */
+  fd = open(pidfile, O_RDONLY);
+  if (fd < 0)
+    return -1;
+  content = nread(fd, &n);
+  if (content == NULL)
+    goto fail;
+  close(fd), fd = -1;
+  
+  if (('0' > content[0]) || (content[0] > '9'))
+    goto bad;
+  if ((content[0] == '0') && ('0' <= content[1]) && (content[1] <= '9'))
+    goto bad;
+  for (p = content; *p; p++)
+    if (('0' <= *p) && (*p <= '9'))
+      pid = pid * 10 + (*p & 15);
+    else
+      break;
+  if (*p++ != '\n')
+    goto bad;
+  if (*p)
+    goto bad;
+  if ((size_t)(content - p) != n)
+    goto bad;
+  sprintf(temp, "%llu", (unsigned long long)pid);
+  if (strcmp(content, temp))
+    goto bad;
+  
+  /* Validate PID */
+  sprintf(temp, "/proc/%llu/environ", (unsigned long long)pid);
+  fd = open(temp, O_RDONLY);
+  if (fd < 0)
+    return ((errno == ENOENT) || (errno == EACCES)) ? 1 : -1;
+  content = nread(fd, &n);
+  if (content == NULL)
+    goto fail;
+  close(fd), fd = -1;
+  
+  for (end = (p = content) + n; p != end; p = strchr(p, '\0') + 1)
+    if (!strcmp(p, token))
+      return 0;
+  
+  return 1;
+ bad:
+  fprintf(stderr, "%s: pid file contain invalid content: %s\n", argv0, pidfile);
+  errno = 0;
+  return -1;
+ fail:
+  saved_errno = errno;
+  free(content);
+  if (fd >= 0)
+    close(fd);
+  errno = saved_errno;
+  return -1;
+}
+
+
+/**
+ * Create PID file
+ * 
+ * @param   pidfile  The pathname of the PID file
+ * @return           Zero on success, -1 on error
+ */
+static int create_pidfile(char* pidfile)
+{
+  int fd, r, saved_errno;
+  char* p;
+  char* token;
+  
+  /* Create token used to validate the service. */
+  token = malloc(sizeof("GAMMAD_PIDFILE_TOKEN=") + strlen(pidfile));
+  if (token == NULL)
+    return -1;
+  sprintf(token, "GAMMAD_PIDFILE_TOKEN=%s", pidfile);
+  if (putenv(token))
+    return -1;
+  
+  /* Create PID file's directory. */
+  for (p = pidfile; *p == '/'; p++);
+  while ((p = strchr(p, '/')))
+    {
+      *p = '\0';
+      if (mkdir(pidfile, 0644) < 0)
+	if (errno != EEXIST)
+	  return -1;
+      *p++ = '/';
+    }
+  
+  /* Create PID file. */
+ retry:
+  fd = open(pidfile, O_CREAT | O_EXCL, 0644);
+  if (fd < 0)
+    {
+      if (errno == EINTR)
+	goto retry;
+      if (errno != EEXIST)
+	return -1;
+      r = is_pidfile_reusable(pidfile, token);
+      if (r > 0)
+	{
+	  unlink(pidfile);
+	  goto retry;
+	}
+      else if (r < 0)
+	goto fail;
+      fprintf(stderr, "%s: service is already running\n", argv0);
+      errno = 0;
+      return -1;
+    }
+  
+  /* Write PID to PID file. */
+  if (dprintf(fd, "%llu\n", (unsigned long long)getpid()) < 0)
+    goto fail;
+  
+  /* Done */
+  if (close(fd) < 0)
+    if (errno != EINTR)
+      return -1;
+  return 0;
+ fail:
+  saved_errno = errno;
+  close(fd);
+  unlink(pidfile);
+  errno = saved_errno;
+  return -1;
+}
+
+
+/**
  * Print usage information and exit
  */
 static void usage(void)
@@ -210,11 +365,13 @@ static void usage(void)
 int main(int argc, char** argv)
 {
   int method = -1, gerror, rc = 1, preserve = 0;
-  char *sitename = NULL;
+  char* sitename = NULL;
   libgamma_site_state_t site;
   libgamma_partition_state_t* partitions = NULL;
   libgamma_crtc_state_t* crtcs = NULL;
   size_t i, j, n, n0;
+  char* pidpath = NULL;
+  char* socketpath = NULL;
   
   memset(&site, 0, sizeof(site));
   
@@ -245,6 +402,19 @@ int main(int argc, char** argv)
   /* Get site */
   if ((gerror = libgamma_site_initialise(&site, method, sitename)))
     goto fail_libgamma;
+  
+  /* Get PID file and socket pathname */
+  if (!(pidpath = get_pidfile_pathname(&site)))
+    goto fail;
+  if (!(socketpath = get_socket_pathname(&site)))
+    goto fail;
+  
+  /* Create PID file */
+  if (create_pidfile(pidpath) < 0)
+    {
+      free(pidpath), pidpath = NULL;
+      goto fail;
+    }
   
   /* Get partitions */
   if (site.partitions_available)
@@ -426,6 +596,10 @@ int main(int argc, char** argv)
       libgamma_partition_destroy(partitions + i);
   free(partitions);
   libgamma_site_destroy(&site);
+  free(socketpath);
+  if (pidpath)
+    unlink(pidpath);
+  free(pidpath);
   return rc;
   /* Fail */
  fail:

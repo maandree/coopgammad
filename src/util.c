@@ -15,7 +15,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this library.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <stddef.h>
+#include "util.h"
+
+#include <sys/stat.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 
 
@@ -27,7 +33,14 @@
  * @return       The duplicate of the memory segment,
  *               `NULL` on error
  */
-void* memdup(const void* src, size_t n);
+void* memdup(const void* src, size_t n)
+{
+  void* dest = malloc(n);
+  if (dest == NULL)
+    return NULL;
+  memcpy(dest, src, n);
+  return dest;
+}
 
 
 /**
@@ -38,5 +51,48 @@ void* memdup(const void* src, size_t n);
  * @return      The read content, plus a NUL byte at
  *              the end (not counted in `*n`)
  */
-void* nread(int fd, size_t* n);
+void* nread(int fd, size_t* n)
+{
+  size_t size = 32;
+  ssize_t got;
+  struct stat st;
+  char* buf = NULL;
+  char* new;
+  int saved_errno;
+  
+  *n = 0;
+  
+  if (!fstat(fd, &st))
+    size = st.st_size <= 0 ? 32 : (size_t)(st.st_size);
+  
+  buf = malloc(size + 1);
+  if (buf == NULL)
+    return NULL;
+  
+  for (;;)
+    {
+      if (*n == size)
+	{
+	  new = realloc(buf, (size <<= 1) + 1);
+	  if (new == NULL)
+	    goto fail;
+	  buf = new;
+	}
+      
+      got = read(fd, buf + *n, size - *n);
+      if (got < 0)
+	goto fail;
+      if (got == 0)
+	break;
+      *n += (size_t)got;
+    }
+  
+  buf[*n] = '\0';
+  return buf;
+ fail:
+  saved_errno = errno;
+  free(buf);
+  errno = saved_errno;
+  return NULL;
+}
 
