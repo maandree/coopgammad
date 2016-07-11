@@ -48,12 +48,13 @@ size_t outputs_n = 0;
 
 
 /**
- * Get the pathname of the socket
+ * Get the pathname of the runtime file
  * 
- * @param   site  The site
- * @return        The pathname of the socket, `NULL` on error
+ * @param   site    The site
+ * @param   suffix  The suffix for the file
+ * @return          The pathname of the file, `NULL` on error
  */
-static char* get_socket_pathname(libgamma_site_state_t* site)
+static char* get_pathname(libgamma_site_state_t* site, const char* suffix)
 {
   const char* rundir = getenv("XDG_RUNTIME_DIR");
   const char* username = "";
@@ -94,17 +95,41 @@ static char* get_socket_pathname(libgamma_site_state_t* site)
   if ((pw = getpwuid(getuid())))
     username = pw->pw_name ? pw->pw_name : "";
   
-  n = sizeof("/.gammad/~/..socket") + 3 * sizeof(int);
-  n += strlen(rundir) + strlen(username) + strlen(name);
+  n = sizeof("/.gammad/~/.") + 3 * sizeof(int);
+  n += strlen(rundir) + strlen(username) + strlen(name) + strlen(suffix);
   if (!(rc = malloc(n)))
     goto fail;
-  sprintf(rc, "%s/.gammad/~%s/%i%s%s.socket",
-	  rundir, username, site->method, name ? "." : "", name ? name : "");
+  sprintf(rc, "%s/.gammad/~%s/%i%s%s%s",
+	  rundir, username, site->method, name ? "." : "", name ? name : "", suffix);
   return rc;
   
  fail:
   free(name);
   return NULL;
+}
+
+
+/**
+ * Get the pathname of the socket
+ * 
+ * @param   site  The site
+ * @return        The pathname of the socket, `NULL` on error
+ */
+static inline char* get_socket_pathname(libgamma_site_state_t* site)
+{
+  return get_pathname(site, ".socket");
+}
+
+
+/**
+ * Get the pathname of the PID file
+ * 
+ * @param   site  The site
+ * @return        The pathname of the PID file, `NULL` on error
+ */
+static inline char* get_pidfile_pathname(libgamma_site_state_t* site)
+{
+  return get_pathname(site, ".pid");
 }
 
 
