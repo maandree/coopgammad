@@ -465,11 +465,11 @@ static int create_pidfile(char* pidfile)
  * @param   preserve     Preserve current gamma ramps at priority 0
  * @param   foreground   Keep process in the foreground
  * @param   keep_stderr  Keep stderr open
- * @return               1: success
- *                       2: normal failure
- *                       3: libgamma failure
- *                       4: the service is already running
- *                       Otherwise: the negative of the exit value the
+ * @return               1: Success
+ *                       2: Normal failure
+ *                       3: Libgamma failure
+ *                       4: The service is already running
+ *                       Otherwise: The negative of the exit value the
  *                       process should have and shall exit immediately
  */
 static int initialise(int method, const char *sitename, int preserve, int foreground, int keep_stderr)
