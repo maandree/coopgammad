@@ -58,6 +58,44 @@ size_t outputs_n = 0;
 int socketfd = -1;
 
 /**
+ * The pathname of the PID file
+ */
+char* pidpath = NULL;
+
+/**
+ * The pathname of the socket
+ */
+char* socketpath = NULL;
+
+/**
+ * Error code returned by libgamma
+ */
+int gerror;
+
+/**
+ * Initialisation stage
+ * 
+ * Used to keep track on what to destroy, of those things that
+ * must only be destroyed if they have been initialised
+ */
+int init_stage = 0;
+
+/**
+ * The libgamma site state
+ */
+libgamma_site_state_t site;
+
+/**
+ * The libgamma partition states
+ */
+libgamma_partition_state_t* partitions = NULL;
+
+/**
+ * The libgamma CRTC states
+ */
+libgamma_crtc_state_t* crtcs = NULL;
+
+/**
  * Has the process receive a signal
  * telling it to re-execute?
  */
@@ -100,11 +138,10 @@ static void sig_terminate(int signo)
 /**
  * Get the pathname of the runtime file
  * 
- * @param   site    The site
  * @param   suffix  The suffix for the file
  * @return          The pathname of the file, `NULL` on error
  */
-static char* get_pathname(libgamma_site_state_t* site, const char* suffix)
+static char* get_pathname(const char* suffix)
 {
   const char* rundir = getenv("XDG_RUNTIME_DIR");
   const char* username = "";
@@ -115,13 +152,13 @@ static char* get_pathname(libgamma_site_state_t* site, const char* suffix)
   size_t n;
   int saved_errno;
   
-  if (site->site)
+  if (site.site)
     {
-      name = memdup(site->site, strlen(site->site) + 1);
+      name = memdup(site.site, strlen(site.site) + 1);
       if (name == NULL)
 	goto fail;
     }
-  else if ((name = libgamma_method_default_site(site->method)))
+  else if ((name = libgamma_method_default_site(site.method)))
     {
       name = memdup(name, strlen(name) + 1);
       if (name == NULL)
@@ -129,7 +166,7 @@ static char* get_pathname(libgamma_site_state_t* site, const char* suffix)
     }
   
   if (name != NULL)
-    switch (site->method)
+    switch (site.method)
       {
       case LIBGAMMA_METHOD_X_RANDR:
       case LIBGAMMA_METHOD_X_VIDMODE:
@@ -151,7 +188,7 @@ static char* get_pathname(libgamma_site_state_t* site, const char* suffix)
   if (!(rc = malloc(n)))
     goto fail;
   sprintf(rc, "%s/.gammad/~%s/%i%s%s%s",
-	  rundir, username, site->method, name ? "." : "", name ? name : "", suffix);
+	  rundir, username, site.method, name ? "." : "", name ? name : "", suffix);
   return rc;
   
  fail:
@@ -165,24 +202,22 @@ static char* get_pathname(libgamma_site_state_t* site, const char* suffix)
 /**
  * Get the pathname of the socket
  * 
- * @param   site  The site
- * @return        The pathname of the socket, `NULL` on error
+ * @return  The pathname of the socket, `NULL` on error
  */
-static inline char* get_socket_pathname(libgamma_site_state_t* site)
+static inline char* get_socket_pathname(void)
 {
-  return get_pathname(site, ".socket");
+  return get_pathname(".socket");
 }
 
 
 /**
  * Get the pathname of the PID file
  * 
- * @param   site  The site
- * @return        The pathname of the PID file, `NULL` on error
+ * @return  The pathname of the PID file, `NULL` on error
  */
-static inline char* get_pidfile_pathname(libgamma_site_state_t* site)
+static inline char* get_pidfile_pathname(void)
 {
-  return get_pathname(site, ".pid");
+  return get_pathname(".pid");
 }
 
 
@@ -423,76 +458,39 @@ static int create_pidfile(char* pidfile)
 
 
 /**
- * Print usage information and exit
- */
-static void usage(void)
-{
-  printf("Usage: %s [-m method] [-s site] [-p]\n", argv0);
-  exit(1);
-}
-
-
-/**
- * Must not be started without stdin, stdout, or stderr (may be /dev/null)
+ * Initialise the process
  * 
- * The process closes stdout when the socket has been created
- * 
- * @return  0: Successful
- *          1: An error occurred
- *          2: Already running
+ * @param   method       The adjustment method, -1 for automatic
+ * @param   sitename     The site's name, may be `NULL`
+ * @param   preserve     Preserve current gamma ramps at priority 0
+ * @param   foreground   Keep process in the foreground
+ * @param   keep_stderr  Keep stderr open
+ * @return               1: success
+ *                       2: normal failure
+ *                       3: libgamma failure
+ *                       4: the service is already running
+ *                       Otherwise: the negative of the exit value the
+ *                       process should have and shall exit immediately
  */
-int main(int argc, char** argv)
+static int initialise(int method, const char *sitename, int preserve, int foreground, int keep_stderr)
 {
-  int method = -1, gerror, rc = 1, preserve = 0, foreground = 0, r;
-  int keep_stderr = 0;
-  char* sitename = NULL;
-  libgamma_site_state_t site;
-  libgamma_partition_state_t* partitions = NULL;
-  libgamma_crtc_state_t* crtcs = NULL;
+  struct sockaddr_un address;
+  struct rlimit rlimit;
   size_t i, j, n, n0;
-  char* pidpath = NULL;
-  char* socketpath = NULL;
   sigset_t mask;
-  int init_stage = 0;
+  char* sitename_dup = NULL;
+  int r;
   
+  /* Zero out some memory so it can be destoried safely. */
   memset(&site, 0, sizeof(site));
   
-  ARGBEGIN
-    {
-    case 's':
-      sitename = EARGF(usage());
-      break;
-    case 'm':
-      method = get_method(EARGF(usage()));
-      if (method < 0)
-	goto fail;
-      break;
-    case 'p':
-      preserve = 1;
-      break;
-    case 'f':
-      foreground = 1;
-      break;
-    case 'k':
-      keep_stderr = 1;
-      break;
-    default:
-      usage();
-    }
-  ARGEND;
-  if (argc > 0)
-    usage();
-  
   /* Close all file descriptors above stderr */
-  {
-    struct rlimit rlimit;
-    if (getrlimit(RLIMIT_NOFILE, &rlimit) || (rlimit.rlim_cur == RLIM_INFINITY))
-      n = 4 << 10;
-    else
-      n = (size_t)(rlimit.rlim_cur);
-    for (i = STDERR_FILENO + 1; i < n; i++)
-      close((int)i);
-  }
+  if (getrlimit(RLIMIT_NOFILE, &rlimit) || (rlimit.rlim_cur == RLIM_INFINITY))
+    n = 4 << 10;
+  else
+    n = (size_t)(rlimit.rlim_cur);
+  for (i = STDERR_FILENO + 1; i < n; i++)
+    close((int)i);
   
   /* Set umask, reset signal handlers, and reset signal mask */
   umask(0);
@@ -505,23 +503,27 @@ int main(int argc, char** argv)
   
   /* Get method */
   if ((method < 0) && (libgamma_list_methods(&method, 1, 0) < 1))
-    return fprintf(stderr, "%s: no adjustment method available\n", argv0), 1;
+    return fprintf(stderr, "%s: no adjustment method available\n", argv0), -1;
   
   /* Get site */
-  if ((gerror = libgamma_site_initialise(&site, method, sitename)))
+  if (sitename != NULL)
+    if (!(sitename_dup = memdup(sitename, strlen(sitename) + 1)))
+      goto fail;
+  if ((gerror = libgamma_site_initialise(&site, method, sitename_dup)))
     goto fail_libgamma;
   
   /* Get PID file and socket pathname */
-  if (!(pidpath = get_pidfile_pathname(&site)))
+  if (!(pidpath = get_pidfile_pathname()))
     goto fail;
-  if (!(socketpath = get_socket_pathname(&site)))
+  if (!(socketpath = get_socket_pathname()))
     goto fail;
   
   /* Create PID file */
   if ((r = create_pidfile(pidpath)) < 0)
     {
       free(pidpath), pidpath = NULL;
-      rc = -r;
+      if (r == -2)
+	goto already_running;
       goto fail;
     }
   
@@ -658,25 +660,22 @@ int main(int argc, char** argv)
       }
   
   /* Create socket and start listening */
-  {
-    struct sockaddr_un address;
-    address.sun_family = AF_UNIX;
-    if (strlen(socketpath) >= sizeof(address.sun_path))
-      {
-	errno = ENAMETOOLONG;
-	goto fail;
-      }
-    strcpy(address.sun_path, socketpath);
-    unlink(socketpath);
-    if ((socketfd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
+  address.sun_family = AF_UNIX;
+  if (strlen(socketpath) >= sizeof(address.sun_path))
+    {
+      errno = ENAMETOOLONG;
       goto fail;
-    if (fchmod(socketfd, S_IRWXU) < 0)
-      goto fail;
-    if (bind(socketfd, (struct sockaddr*)(&address), sizeof(address)) < 0)
-      goto fail;
-    if (listen(socketfd, SOMAXCONN) < 0)
-      goto fail;
-  }
+    }
+  strcpy(address.sun_path, socketpath);
+  unlink(socketpath);
+  if ((socketfd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
+    goto fail;
+  if (fchmod(socketfd, S_IRWXU) < 0)
+    goto fail;
+  if (bind(socketfd, (struct sockaddr*)(&address), sizeof(address)) < 0)
+    goto fail;
+  if (listen(socketfd, SOMAXCONN) < 0)
+    goto fail;
   
   /* Change directory to / to avoid blocking umounting */
   if (chdir("/") < 0)
@@ -763,7 +762,7 @@ int main(int argc, char** argv)
 	  if (got < 0)
 	    goto fail_background;
 	  close(notify_rw[0]);
-	  return got == 0;
+	  return -(got == 0);
 	}
       
       goto done_background;
@@ -785,9 +784,23 @@ int main(int argc, char** argv)
 	perror(argv0);
     }
   
-  /* Done */
-  rc = 0;
- done:
+  return 1;
+ fail:
+  return 2;
+ fail_libgamma:
+  return 3;
+ already_running:
+  return 4;
+}
+
+
+/**
+ * Deinitialise the process
+ */
+static void destroy(void)
+{
+  size_t i;
+  
   if (init_stage >= 1)
     server_destroy(1);
   if (socketfd >= 0)
@@ -832,9 +845,14 @@ int main(int argc, char** argv)
 	    default:
 	      break; /* impossible */
 	    }
-	libgamma_crtc_destroy(outputs[i].crtc + i);
+	if (crtcs == NULL)
+	  libgamma_crtc_destroy(outputs[i].crtc + i);
 	output_destroy(outputs + i);
       }
+  free(outputs);
+  if (crtcs != NULL)
+    for (i = 0; i < outputs_n; i++)
+      libgamma_crtc_destroy(crtcs + i);
   free(crtcs);
   if (partitions != NULL)
     for (i = 0; i < site.partitions_available; i++)
@@ -845,8 +863,78 @@ int main(int argc, char** argv)
   if (pidpath)
     unlink(pidpath);
   free(pidpath);
+}
+
+
+/**
+ * Print usage information and exit
+ */
+static void usage(void)
+{
+  printf("Usage: %s [-m method] [-s site] [-p]\n", argv0);
+  exit(1);
+}
+
+
+/**
+ * Must not be started without stdin, stdout, or stderr (may be /dev/null)
+ * 
+ * The process closes stdout when the socket has been created
+ * 
+ * @return  0: Successful
+ *          1: An error occurred
+ *          2: Already running
+ */
+int main(int argc, char** argv)
+{
+  int method = -1, rc = 1, preserve = 0, foreground = 0, keep_stderr = 0, r;
+  char* sitename = NULL;
+  
+  ARGBEGIN
+    {
+    case 's':
+      sitename = EARGF(usage());
+      break;
+    case 'm':
+      method = get_method(EARGF(usage()));
+      if (method < 0)
+	goto fail;
+      break;
+    case 'p':
+      preserve = 1;
+      break;
+    case 'f':
+      foreground = 1;
+      break;
+    case 'k':
+      keep_stderr = 1;
+      break;
+    default:
+      usage();
+    }
+  ARGEND;
+  if (argc > 0)
+    usage();
+  
+  switch ((r = initialise(method, sitename, preserve, foreground, keep_stderr)))
+    {
+    case 1:
+      break;
+    case 2:
+      goto fail;
+    case 3:
+      goto fail_libgamma;
+    case 4:
+      rc = 2;
+      goto fail;
+    default:
+      return -r;
+    }
+  
+  rc = 0;
+ done:
+  destroy();
   return rc;
-  /* Fail */
  fail:
   if (errno != 0)
     perror(argv0);
