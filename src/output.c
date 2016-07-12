@@ -224,3 +224,101 @@ int output_cmp_by_name(const void* a, const void* b)
   return strcmp(an, bn);
 }
 
+
+/**
+ * Find an output by its name
+ * 
+ * @param   key   The name of the output
+ * @param   base  The array of outputs
+ * @param   n     The number of elements in `base`
+ * @return        Output find in `base`, `NULL` if not found
+ */
+struct output* output_find_by_name(const char* key, struct output* base, size_t n)
+{
+  struct output k;
+
+#if defined(__GNUC__)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wcast-qual"
+#endif
+  k.name = (char*)key;
+#if defined(__GNUC__)
+# pragma GCC diagnostic pop
+#endif
+  
+  return bsearch(&k, base, n, sizeof(*base), output_cmp_by_name);
+}
+
+
+/**
+ * Add a filter to an output
+ * 
+ * @param   out     The output
+ * @param   filter  The filter
+ * @return          The index given to the filter, -1 on error
+ */
+ssize_t add_filter(struct output* out, struct filter* filter)
+{
+  size_t i, n = out->table_size;
+  int r = -1;
+  
+  for (i = 0; i < n; i++)
+    if (filter->priority > out->table_filters[i].priority)
+      break;
+  
+  if (n == out->table_alloc)
+    {
+      void* new;
+      
+      new = realloc(out->table_filters, (n + 10) * sizeof(*(out->table_filters)));
+      if (new == NULL)
+	return -1;
+      out->table_filters = new;
+      
+      new = realloc(out->table_sums, (n + 10) * sizeof(*(out->table_sums)));
+      if (new == NULL)
+	return -1;
+      out->table_sums = new;
+      
+      out->table_alloc += 10;
+    }
+  
+  memmove(out->table_filters + i + 1, out->table_filters + i, (n - i) * sizeof(*(out->table_filters)));
+  memmove(out->table_sums    + i + 1, out->table_sums    + i, (n - i) * sizeof(*(out->table_sums)));
+  out->table_size++;
+  
+  COPY_RAMP_SIZES(&(out->table_sums[i].u8), out);
+  switch (out->depth)
+    {
+    case  8:  r = libgamma_gamma_ramps8_initialise(&(out->table_sums[i].u8));    break;
+    case 16:  r = libgamma_gamma_ramps16_initialise(&(out->table_sums[i].u16));  break;
+    case 32:  r = libgamma_gamma_ramps32_initialise(&(out->table_sums[i].u32));  break;
+    case 64:  r = libgamma_gamma_ramps64_initialise(&(out->table_sums[i].u64));  break;
+    case -1:  r = libgamma_gamma_rampsf_initialise(&(out->table_sums[i].f));     break;
+    case -2:  r = libgamma_gamma_rampsd_initialise(&(out->table_sums[i].d));     break;
+    default:
+      abort();
+    }
+  if (r < 0)
+    return -1;
+  
+  out->table_filters[i] = *filter;
+  
+  return (ssize_t)i;
+}
+
+
+/**
+ * Recalculate the resulting gamma and
+ * update push the new gamam ramps to the CRTC
+ * 
+ * @param   output         The output
+ * @param   first_updated  The index of the first added or removed filter
+ * @return                 Zero on success, -1 on error
+ */
+int flush_filters(struct output* output, size_t first_updated)
+{
+  /* TODO */ (void) output, (void) first_updated;
+  return 0;
+}
+

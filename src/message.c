@@ -458,13 +458,14 @@ static int continue_read(struct message* this, int fd)
  * 
  * @param   this  Memory slot in which to store the new message
  * @param   fd    The file descriptor
- * @return        Non-zero on error or interruption, `errno` will be
- *                set accordingly. Destroy the message on error,
- *                be aware that the reading could have been
- *                interrupted by a signal rather than canonical error.
- *                If -2 is returned `errno` will not have been set,
- *                -2 indicates that the message is malformated,
- *                which is a state that cannot be recovered from.
+ * @return        0:  At least one message is available
+ *                -1: Exceptional connection:
+ *                  EINTR:        System call interrupted
+ *                  EAGAIN:       No message is available
+ *                  EWOULDBLOCK:  No message is available
+ *                  ECONNRESET:   Connection closed
+ *                  Other:        Failure
+ *                -2: Corrupt message (unrecoverable)
  */
 int message_read(struct message* this, int fd)
 {

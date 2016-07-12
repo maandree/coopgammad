@@ -31,7 +31,6 @@
  */
 void filter_destroy(struct filter* this)
 {
-  free(this->crtc);
   free(this->class);
   free(this->ramps);
 }
@@ -55,9 +54,8 @@ size_t filter_marshal(const struct filter* this, void* buf, size_t ramps_size)
   
   if (bs != NULL)
     {
-      if (this->crtc  != NULL)  nonnulls |= 1;
-      if (this->class != NULL)  nonnulls |= 2;
-      if (this->ramps != NULL)  nonnulls |= 4;
+      if (this->class != NULL)  nonnulls |= 1;
+      if (this->ramps != NULL)  nonnulls |= 2;
       *(bs + off) = nonnulls;
     }
   off += 1;
@@ -69,14 +67,6 @@ size_t filter_marshal(const struct filter* this, void* buf, size_t ramps_size)
   if (bs != NULL)
     *(enum lifespan*)(bs + off) = this->lifespan;
   off += sizeof(enum lifespan);
-  
-  if (this->crtc != NULL)
-    {
-      n = strlen(this->crtc) + 1;
-      if (bs != NULL)
-	memcpy(bs + off, this->crtc, n);
-      off += n;
-    }
   
   if (this->class != NULL)
     {
@@ -114,7 +104,6 @@ size_t filter_unmarshal(struct filter* this, const void* buf, size_t ramps_size)
   nonnulls = *(bs + off);
   off += 1;
   
-  this->crtc  = NULL;
   this->class = NULL;
   this->ramps = NULL;
   
@@ -127,20 +116,12 @@ size_t filter_unmarshal(struct filter* this, const void* buf, size_t ramps_size)
   if (nonnulls & 1)
     {
       n = strlen(bs + off) + 1;
-      if (!(this->crtc = memdup(bs + off, n)))
-	goto fail;
-      off += n;
-    }
-  
-  if (nonnulls & 2)
-    {
-      n = strlen(bs + off) + 1;
       if (!(this->class = memdup(bs + off, n)))
 	goto fail;
       off += n;
     }
   
-  if (nonnulls & 4)
+  if (nonnulls & 2)
     {
       if (!(this->ramps = memdup(bs + off, ramps_size)))
 	goto fail;
@@ -150,7 +131,6 @@ size_t filter_unmarshal(struct filter* this, const void* buf, size_t ramps_size)
   return off;
   
  fail:
-  free(this->crtc);
   free(this->class);
   free(this->ramps);
   return 0;

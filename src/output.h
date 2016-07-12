@@ -175,3 +175,35 @@ __attribute__((pure))
 #endif
 int output_cmp_by_name(const void* a, const void* b);
 
+/**
+ * Find an output by its name
+ * 
+ * @param   key   The name of the output
+ * @param   base  The array of outputs
+ * @param   n     The number of elements in `base`
+ * @return        Output find in `base`, `NULL` if not found
+ */
+#if defined(__GNUC__)
+__attribute__((pure))
+#endif
+struct output* output_find_by_name(const char* key, struct output* base, size_t n);
+
+/**
+ * Add a filter to an output
+ * 
+ * @param   output  The output
+ * @param   filter  The filter
+ * @return          The index given to the filter, -1 on error
+ */
+ssize_t add_filter(struct output* output, struct filter* filter);
+
+/**
+ * Recalculate the resulting gamma and
+ * update push the new gamam ramps to the CRTC
+ * 
+ * @param   output         The output
+ * @param   first_updated  The index of the first added or removed filter
+ * @return                 Zero on success, -1 on error
+ */
+int flush_filters(struct output* output, size_t first_updated);
+

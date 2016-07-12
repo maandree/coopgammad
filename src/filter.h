@@ -60,12 +60,6 @@ struct filter
   int client;
   
   /**
-   * Identifier for the CRTC to which this filter
-   * should be applied. May be removed once applied.
-   */
-  char* crtc;
-  
-  /**
    * The priority of the filter
    */
   int64_t priority;

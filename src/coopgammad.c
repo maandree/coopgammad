@@ -673,7 +673,6 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
       {
 	struct filter filter = {
 	  .client   = -1,
-	  .crtc     = NULL,
 	  .priority = 0,
 	  .class    = NULL,
 	  .lifespan = LIFESPAN_UNTIL_REMOVAL,
