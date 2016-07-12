@@ -25,7 +25,8 @@
 
 /**
  * Free all resources allocated to an output.
- * The allocation of `output` itself is not freed.
+ * The allocation of `output` itself is not freed,
+ * nor is its the libgamma destroyed.
  * 
  * @param  this  The output
  */
