@@ -82,7 +82,11 @@ void* nread(int fd, size_t* n)
       
       got = read(fd, buf + *n, size - *n);
       if (got < 0)
-	goto fail;
+	{
+	  if (errno == EINTR)
+	    continue;
+	  goto fail;
+	}
       if (got == 0)
 	break;
       *n += (size_t)got;
@@ -95,6 +99,39 @@ void* nread(int fd, size_t* n)
   free(buf);
   errno = saved_errno;
   return NULL;
+}
+
+
+/**
+ * Write an entire buffer to a file
+ * 
+ * Not cancelled by `EINTR`
+ * 
+ * @param   fd   The file descriptor
+ * @param   buf  The buffer which shall be written to the fail
+ * @param   n    The size of the buffer
+ * @return       The number of written bytes, less than `n`
+ *               on error, cannot exceed `n`
+ */
+size_t nwrite(int fd, const void* buf, size_t n)
+{
+  const char* bs = buf;
+  ssize_t wrote;
+  size_t ptr = 0;
+  
+  while (ptr < n)
+    {
+      wrote = write(fd, bs + ptr, n - ptr);
+      if (wrote <= 0)
+	{
+	  if ((wrote < 0) && (errno == EINTR))
+	    continue;
+	  return ptr;
+	}
+      ptr += (size_t)wrote;
+    }
+  
+  return ptr;
 }
 
 

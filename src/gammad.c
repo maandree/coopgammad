@@ -1210,7 +1210,8 @@ static void usage(void)
 int main(int argc, char** argv)
 {
   int rc = 1, preserve = 0, foreground = 0, keep_stderr = 0, r;
-  const char* statefile = NULL;
+  char* statefile = NULL;
+  char* statebuffer = NULL;
   
   ARGBEGIN
     {
@@ -1245,6 +1246,8 @@ int main(int argc, char** argv)
   if (argc > 0)
     usage();
   
+ restart: /* If C had comefrom: comefrom reexec_failure; */
+  
   switch ((r = initialise(statefile == NULL, preserve, foreground, keep_stderr)))
     {
     case 1:
@@ -1265,12 +1268,60 @@ int main(int argc, char** argv)
       if (unmarshal_and_merge_state(statefile) < 0)
 	goto fail;
       unlink(statefile), statefile = NULL;
+      reexec = 0; /* See `if (reexec && !terminate)` */
+    }
+  
+  if (reexec && !terminate)
+    {
+      size_t buffer_size;
+      int fd;
+      
+      /* `reexec = 0;` is done later in case of re-execute failure,
+       * since it determines whether `statefile` shall be freed. */
+      
+      statefile = get_state_pathname();
+      if (statefile == NULL)
+	goto fail;
+      
+      buffer_size = marshal(NULL);
+      statebuffer = malloc(buffer_size);
+      if (statebuffer == NULL)
+	goto fail;
+      if (marshal(statebuffer) != buffer_size)
+	abort();
+      
+      fd = open(statefile, O_CREAT, S_IRUSR | S_IWUSR);
+      if (fd < 0)
+	goto fail;
+      
+      if (nwrite(fd, statebuffer, buffer_size) != buffer_size)
+	{
+	  perror(argv0);
+	  close(fd);
+	  errno = 0;
+	  goto fail;
+	}
+      free(statebuffer), statebuffer = NULL;
+      
+      if ((close(fd) < 0) && (errno != EINTR))
+	goto fail;
+      
+      destroy(0);
+      
+      execlp(argv0_real ? argv0_real : argv0, argv0, "-#", statefile, preserve ? "-p" : NULL, NULL);
+      perror(argv0);
+      fprintf(stderr, "%s: restoring state without re-executing\n", argv0);
+      free(argv0_real), argv0_real = NULL;
+      goto restart;
     }
   
   rc = 0;
  done:
+  free(statebuffer);
   if (statefile)
     unlink(statefile);
+  if (reexec)
+    free(statefile);
   destroy(1);
   return rc;
  fail:

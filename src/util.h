@@ -33,12 +33,28 @@ void* memdup(const void* src, size_t n);
 /**
  * Read an entire file
  * 
+ * Not cancelled by `EINTR`
+ * 
  * @param   fd  The file descriptor
  * @param   n   Output for the size of the file
  * @return      The read content, plus a NUL byte at
  *              the end (not counted in `*n`)
  */
 void* nread(int fd, size_t* n);
+
+
+/**
+ * Write an entire buffer to a file
+ * 
+ * Not cancelled by `EINTR`
+ * 
+ * @param   fd   The file descriptor
+ * @param   buf  The buffer which shall be written to the fail
+ * @param   n    The size of the buffer
+ * @return       The number of written bytes, less than `n`
+ *               on error, cannot exceed `n`
+ */
+size_t nwrite(int fd, const void* buf, size_t n);
 
 
 /**
