@@ -38,6 +38,14 @@
 
 
 /**
+ * Number put in front of the marshalled data
+ * so the program an detect incompatible updates
+ */
+#define MARSHAL_VERSION  0
+
+
+
+/**
  * The name of the process
  */
 char* argv0;
@@ -85,6 +93,16 @@ int gerror;
  * must only be destroyed if they have been initialised
  */
 int init_stage = 0;
+
+/**
+ * The adjustment method, -1 for automatic
+ */
+int method = -1;
+
+/**
+ * The site's name, may be `NULL`
+ */
+char* sitename = NULL;
 
 /**
  * The libgamma site state
@@ -224,6 +242,17 @@ static inline char* get_socket_pathname(void)
 static inline char* get_pidfile_pathname(void)
 {
   return get_pathname(".pid");
+}
+
+
+/**
+ * Get the pathname of the state file
+ * 
+ * @return  The pathname of the state file, `NULL` on error
+ */
+static inline char* get_state_pathname(void)
+{
+  return get_pathname(".state");
 }
 
 
@@ -463,8 +492,8 @@ static int create_pidfile(char* pidfile)
 /**
  * Initialise the process
  * 
- * @param   method       The adjustment method, -1 for automatic
- * @param   sitename     The site's name, may be `NULL`
+ * @param   full         Perform a full initialisation, shall be done
+ *                       iff the state is not going to be unmarshalled
  * @param   preserve     Preserve current gamma ramps at priority 0
  * @param   foreground   Keep process in the foreground
  * @param   keep_stderr  Keep stderr open
@@ -475,7 +504,7 @@ static int create_pidfile(char* pidfile)
  *                       Otherwise: The negative of the exit value the
  *                       process should have and shall exit immediately
  */
-static int initialise(int method, const char *sitename, int preserve, int foreground, int keep_stderr)
+static int initialise(int full, int preserve, int foreground, int keep_stderr)
 {
   struct sockaddr_un address;
   struct rlimit rlimit;
@@ -487,22 +516,25 @@ static int initialise(int method, const char *sitename, int preserve, int foregr
   /* Zero out some memory so it can be destoried safely. */
   memset(&site, 0, sizeof(site));
   
-  /* Close all file descriptors above stderr */
-  if (getrlimit(RLIMIT_NOFILE, &rlimit) || (rlimit.rlim_cur == RLIM_INFINITY))
-    n = 4 << 10;
-  else
-    n = (size_t)(rlimit.rlim_cur);
-  for (i = STDERR_FILENO + 1; i < n; i++)
-    close((int)i);
-  
-  /* Set umask, reset signal handlers, and reset signal mask */
-  umask(0);
-  for (r = 1; r < _NSIG; r++)
-    signal(r, SIG_DFL);
-  if (sigfillset(&mask))
-    perror(argv0);
-  else
-    sigprocmask(SIG_UNBLOCK, &mask, NULL);
+  if (full)
+    {
+      /* Close all file descriptors above stderr */
+      if (getrlimit(RLIMIT_NOFILE, &rlimit) || (rlimit.rlim_cur == RLIM_INFINITY))
+	n = 4 << 10;
+      else
+	n = (size_t)(rlimit.rlim_cur);
+      for (i = STDERR_FILENO + 1; i < n; i++)
+	close((int)i);
+      
+      /* Set umask, reset signal handlers, and reset signal mask */
+      umask(0);
+      for (r = 1; r < _NSIG; r++)
+	signal(r, SIG_DFL);
+      if (sigfillset(&mask))
+	perror(argv0);
+      else
+	sigprocmask(SIG_UNBLOCK, &mask, NULL);
+    }
   
   /* Get method */
   if ((method < 0) && (libgamma_list_methods(&method, 1, 0) < 1))
@@ -515,19 +547,22 @@ static int initialise(int method, const char *sitename, int preserve, int foregr
   if ((gerror = libgamma_site_initialise(&site, method, sitename_dup)))
     goto fail_libgamma;
   
-  /* Get PID file and socket pathname */
-  if (!(pidpath = get_pidfile_pathname()))
-    goto fail;
-  if (!(socketpath = get_socket_pathname()))
-    goto fail;
-  
-  /* Create PID file */
-  if ((r = create_pidfile(pidpath)) < 0)
+  if (full)
     {
-      free(pidpath), pidpath = NULL;
-      if (r == -2)
-	goto already_running;
-      goto fail;
+      /* Get PID file and socket pathname */
+      if (!(pidpath = get_pidfile_pathname()))
+	goto fail;
+      if (!(socketpath = get_socket_pathname()))
+	goto fail;
+      
+      /* Create PID file */
+      if ((r = create_pidfile(pidpath)) < 0)
+	{
+	  free(pidpath), pidpath = NULL;
+	  if (r == -2)
+	    goto already_running;
+	  goto fail;
+	}
     }
   
   /* Get partitions */
@@ -662,33 +697,36 @@ static int initialise(int method, const char *sitename, int preserve, int foregr
 	  goto fail;
       }
   
-  /* Create socket and start listening */
-  address.sun_family = AF_UNIX;
-  if (strlen(socketpath) >= sizeof(address.sun_path))
+  if (full)
     {
-      errno = ENAMETOOLONG;
-      goto fail;
+      /* Create socket and start listening */
+      address.sun_family = AF_UNIX;
+      if (strlen(socketpath) >= sizeof(address.sun_path))
+	{
+	  errno = ENAMETOOLONG;
+	  goto fail;
+	}
+      strcpy(address.sun_path, socketpath);
+      unlink(socketpath);
+      if ((socketfd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
+	goto fail;
+      if (fchmod(socketfd, S_IRWXU) < 0)
+	goto fail;
+      if (bind(socketfd, (struct sockaddr*)(&address), sizeof(address)) < 0)
+	goto fail;
+      if (listen(socketfd, SOMAXCONN) < 0)
+	goto fail;
+      
+      /* Get the real pathname of the process's binary, in case
+       * it is relative, so we can re-execute without problem. */
+      if ((*argv0 != '/') && strchr(argv0, '/'))
+	if (!(argv0_real = realpath(argv0, NULL)))
+	  goto fail;
+      
+      /* Change directory to / to avoid blocking umounting */
+      if (chdir("/") < 0)
+	perror(argv0);
     }
-  strcpy(address.sun_path, socketpath);
-  unlink(socketpath);
-  if ((socketfd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
-    goto fail;
-  if (fchmod(socketfd, S_IRWXU) < 0)
-    goto fail;
-  if (bind(socketfd, (struct sockaddr*)(&address), sizeof(address)) < 0)
-    goto fail;
-  if (listen(socketfd, SOMAXCONN) < 0)
-    goto fail;
-  
-  /* Get the real pathname of the process's binary, in case
-   * it is relative, so we can re-execute without problem. */
-  if ((*argv0 != '/') && strchr(argv0, '/'))
-    if (!(argv0_real = realpath(argv0, NULL)))
-      goto fail;
-  
-  /* Change directory to / to avoid blocking umounting */
-  if (chdir("/") < 0)
-    perror(argv0);
   
   /* Set up signal handlers */
   if (signal(SIGUSR1, sig_reexec) == SIG_ERR)
@@ -696,13 +734,16 @@ static int initialise(int method, const char *sitename, int preserve, int foregr
   if (signal(SIGTERM, sig_terminate) == SIG_ERR)
     goto fail;
   
-  /* Initialise the server */
-  if (server_initialise() < 0)
-    goto fail;
-  init_stage++;
+  if (full)
+    {
+      /* Initialise the server */
+      if (server_initialise() < 0)
+	goto fail;
+      init_stage++;
+    }
   
   /* Place in the background unless -f */
-  if (foreground == 0)
+  if (full && (foreground == 0))
     {
       pid_t pid;
       int fd = -1, saved_errno;
@@ -783,7 +824,7 @@ static int initialise(int method, const char *sitename, int preserve, int foregr
       errno = saved_errno;
     done_background:;
     }
-  else
+  else if (full)
     {
       /* Signal the spawner that the service is ready */
       close(STDOUT_FILENO);
@@ -873,6 +914,84 @@ static void destroy(void)
     unlink(pidpath);
   free(pidpath);
   free(argv0_real);
+  free(sitename);
+}
+
+
+/**
+ * Marshal the state of the process
+ * 
+ * @param   buf  Output buffer for the marshalled data,
+ *               `NULL` to only measure how large the
+ *               buffer needs to be
+ * @return       The number of marshalled news
+ */
+static size_t marshal(void* buf)
+{
+  size_t off = 0, i, n;
+  char* bs = buf;
+  
+  if (bs != NULL)
+    *(int*)(bs + off) = MARSHAL_VERSION;
+  off += sizeof(int);
+  
+  if (argv0_real == NULL)
+    {
+      if (bs != NULL)
+	*(bs + off) = '\0';
+      off += 1;
+    }
+  else
+    {
+      n = strlen(argv0_real) + 1;
+      if (bs != NULL)
+	memcpy(bs + off, argv0_real, n);
+      off += n;
+    }
+  
+  if (bs != NULL)
+    *(size_t*)(bs + off) = outputs_n;
+  off += sizeof(size_t);
+  
+  for (i = 0; i < outputs_n; i++)
+    off += output_marshal(outputs + i , bs ? bs + off : NULL);
+  
+  if (bs != NULL)
+    *(int*)(bs + off) = socketfd;
+  off += sizeof(int);
+  
+  n = strlen(pidpath) + 1;
+  if (bs != NULL)
+    memcpy(bs + off, pidpath, n);
+  off += n;
+  
+  n = strlen(socketpath) + 1;
+  if (bs != NULL)
+    memcpy(bs + off, socketpath, n);
+  off += n;
+  
+  off += server_marshal(bs ? bs + off : NULL);
+  
+  if (bs != NULL)
+    *(int*)(bs + off) = init_stage;
+  off += sizeof(int);
+  
+  if (bs != NULL)
+    *(int*)(bs + off) = method;
+  off += sizeof(int);
+  
+  if (bs != NULL)
+    *(int*)(bs + off) = sitename != NULL;
+  off += sizeof(int);
+  if (sitename != NULL)
+    {
+      n = strlen(sitename) + 1;
+      if (bs != NULL)
+	memcpy(bs + off, sitename, n);
+      off += n;
+    }
+  
+  return off;
 }
 
 
@@ -915,13 +1034,17 @@ static void usage(void)
  */
 int main(int argc, char** argv)
 {
-  int method = -1, rc = 1, preserve = 0, foreground = 0, keep_stderr = 0, r;
-  char* sitename = NULL;
+  int rc = 1, preserve = 0, foreground = 0, keep_stderr = 0, r;
+  char* statefile = NULL;
   
   ARGBEGIN
     {
     case 's':
       sitename = EARGF(usage());
+      /* To simplify re-exec: */
+      sitename = memdup(sitename, strlen(sitename) + 1);
+      if (sitename == NULL)
+	goto fail;
       break;
     case 'm':
       method = get_method(EARGF(usage()));
@@ -937,6 +1060,9 @@ int main(int argc, char** argv)
     case 'k':
       keep_stderr = 1;
       break;
+    case '#': /* Internal, do not document */
+      statefile = EARGF(usage());
+      break;
     default:
       usage();
     }
@@ -944,7 +1070,7 @@ int main(int argc, char** argv)
   if (argc > 0)
     usage();
   
-  switch ((r = initialise(method, sitename, preserve, foreground, keep_stderr)))
+  switch ((r = initialise(statefile == NULL, preserve, foreground, keep_stderr)))
     {
     case 1:
       break;
@@ -957,6 +1083,11 @@ int main(int argc, char** argv)
       goto fail;
     default:
       return -r;
+    }
+  
+  if (statefile != NULL)
+    {
+      /* TODO unmarshal */
     }
   
   rc = 0;
