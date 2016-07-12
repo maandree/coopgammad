@@ -1,9 +1,9 @@
-PKGNAME = gammad
-COMMAND = gammad
+PKGNAME = coopgammad
+COMMAND = coopgammad
 
 KERNEL = $(shell uname | tr '[A-Z]_' '[a-z]-')
 
-SRC = filter gammad output ramps util message server
+SRC = filter coopgammad output ramps util message server
 
 OPTIMISE = -Og -g
 
@@ -28,9 +28,9 @@ CPPFLAGS = -D'PKGNAME="$(PKGNAME)"' -D'COMMAND="$(COMMAND)"' -D_XOPEN_SOURCE=700
 
 
 .PHONY: all
-all: bin/gammad
+all: bin/coopgammad
 
-bin/gammad: $(foreach S,$(SRC),obj/$(S).o)
+bin/coopgammad: $(foreach S,$(SRC),obj/$(S).o)
 	@mkdir -p -- "$$(dirname -- "$@")"
 	$(CC) $(LDFLAGS) -o $@ $^
 

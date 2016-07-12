@@ -1,5 +1,5 @@
 /**
- * gammad -- Cooperative gamma server
+ * coopgammad -- Cooperative gamma server
  * Copyright (C) 2016  Mattias Andrée (maandree@kth.se)
  * 
  * This library is free software: you can redistribute it and/or modify
@@ -207,11 +207,11 @@ static char* get_pathname(const char* suffix)
   if ((pw = getpwuid(getuid())))
     username = pw->pw_name ? pw->pw_name : "";
   
-  n = sizeof("/.gammad/~/.") + 3 * sizeof(int);
+  n = sizeof("/.coopgammad/~/.") + 3 * sizeof(int);
   n += strlen(rundir) + strlen(username) + strlen(name) + strlen(suffix);
   if (!(rc = malloc(n)))
     goto fail;
-  sprintf(rc, "%s/.gammad/~%s/%i%s%s%s",
+  sprintf(rc, "%s/.coopgammad/~%s/%i%s%s%s",
 	  rundir, username, site.method, name ? "." : "", name ? name : "", suffix);
   return rc;
   
@@ -325,7 +325,7 @@ static char* get_crtc_name(libgamma_crtc_information_t* info, libgamma_crtc_stat
  * 
  * @param   pidfile  The PID file
  * @param   token    An environment variable (including both key and value)
- *                   that must exist in the process if it is a gammad process
+ *                   that must exist in the process if it is a coopgammad process
  * @return           -1: An error occurred
  *                    0: The service is already running
  *                    1: The PID file is outdated
@@ -431,10 +431,10 @@ static int create_pidfile(char* pidfile)
   char* token;
   
   /* Create token used to validate the service. */
-  token = malloc(sizeof("GAMMAD_PIDFILE_TOKEN=") + strlen(pidfile));
+  token = malloc(sizeof("COOPGAMMAD_PIDFILE_TOKEN=") + strlen(pidfile));
   if (token == NULL)
     return -1;
-  sprintf(token, "GAMMAD_PIDFILE_TOKEN=%s", pidfile);
+  sprintf(token, "COOPGAMMAD_PIDFILE_TOKEN=%s", pidfile);
   if (putenv(token))
     return -1;
   

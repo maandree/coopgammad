@@ -1,5 +1,5 @@
 /**
- * gammad -- Cooperative gamma server
+ * coopgammad -- Cooperative gamma server
  * Copyright (C) 2016  Mattias Andrée (maandree@kth.se)
  * 
  * This library is free software: you can redistribute it and/or modify
