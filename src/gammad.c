@@ -846,14 +846,17 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr)
 
 /**
  * Deinitialise the process
+ * 
+ * @param  full  Perform a full deinitialisation, shall be
+ *               done iff the process is going to re-execute
  */
-static void destroy(void)
+static void destroy(int full)
 {
   size_t i;
   
   if (init_stage >= 1)
-    server_destroy(1);
-  if (socketfd >= 0)
+    server_destroy(full);
+  if (full && (socketfd >= 0))
     {
       shutdown(socketfd, SHUT_RDWR);
       close(socketfd);
@@ -871,7 +874,7 @@ static void destroy(void)
   if (outputs != NULL)
     for (i = 0; i < outputs_n; i++)
       {
-	if (outputs[i].supported != LIBGAMMA_NO)
+	if (full && (outputs[i].supported != LIBGAMMA_NO))
 	  switch (outputs[i].depth)
 	    {
 	    case 8:
@@ -910,7 +913,7 @@ static void destroy(void)
   free(partitions);
   libgamma_site_destroy(&site);
   free(socketpath);
-  if (pidpath)
+  if (full && (pidpath != NULL))
     unlink(pidpath);
   free(pidpath);
   free(argv0_real);
@@ -924,7 +927,7 @@ static void destroy(void)
  * @param   buf  Output buffer for the marshalled data,
  *               `NULL` to only measure how large the
  *               buffer needs to be
- * @return       The number of marshalled news
+ * @return       The number of marshalled bytes
  */
 static size_t marshal(void* buf)
 {
@@ -996,6 +999,128 @@ static size_t marshal(void* buf)
 
 
 /**
+ * Unmarshal the state of the process
+ * 
+ * @param   buf  Buffer with the marshalled data
+ * @return       The number of marshalled bytes, 0 on error
+ */
+static size_t unmarshal(void* buf)
+{
+  size_t off = 0, i, n;
+  char* bs = buf;
+  
+  if (*(int*)(bs + off) != MARSHAL_VERSION)
+    {
+      fprintf(stderr, "%s: re-executing to incompatible version, sorry about that\n", argv0);
+      errno = 0;
+      return 0;
+    }
+  off += sizeof(int);
+  
+  if (*(bs + off))
+    {
+      off += 1;
+      n = strlen(bs + off) + 1;
+      if (!(argv0_real = memdup(bs + off, n)))
+	return 0;
+      off += n;
+    }
+  else
+    off += 1;
+  
+  outputs_n = *(size_t*)(bs + off);
+  off += sizeof(size_t);
+  
+  for (i = 0; i < outputs_n; i++)
+    {
+      off += n = output_unmarshal(outputs + i, bs + off);
+      if (n == 0)
+	return 0;
+    }
+  
+  socketfd = *(int*)(bs + off);
+  off += sizeof(int);
+  
+  n = strlen(bs + off) + 1;
+  if (!(pidpath = memdup(bs + off, n)))
+    return 0;
+  off += n;
+  
+  n = strlen(bs + off) + 1;
+  if (!(socketpath = memdup(bs + off, n)))
+    return 0;
+  off += n;
+  
+  off += n = server_unmarshal(bs + off);
+  if (n == 0)
+    return 0;
+  
+  init_stage = *(int*)(bs + off);
+  off += sizeof(int);
+  
+  method = *(int*)(bs + off);
+  off += sizeof(int);
+  
+  if (*(int*)(bs + off))
+    {
+      off += sizeof(int);
+      n = strlen(bs + off) + 1;
+      if (!(sitename = memdup(bs + off, n)))
+	return 0;
+      off += n;
+    }
+  else
+    off += sizeof(int);
+  
+  return off;
+}
+
+
+/**
+ * Unmarshal the state of the process and merge with new state
+ * 
+ * @param   statefile  The state file
+ * @return             Zero on success, -1 on error
+ */
+static int unmarshal_and_merge_state(const char* statefile)
+{
+  struct output* old_outputs = outputs;
+  size_t i, j, _n, old_outputs_n = outputs_n;
+  void* marshalled = NULL;
+  int fd = -1, saved_errno;
+  
+  outputs = NULL;
+  outputs_n = 0;
+  
+  fd = open(statefile, O_RDONLY);
+  if (fd < 0)
+    goto fail;
+  if (!(marshalled = nread(fd, &_n)))
+    goto fail;
+  close(fd), fd = -1;
+  unlink(statefile), statefile = NULL;
+  
+  if (unmarshal(marshalled) == 0)
+    goto fail;
+  free(marshalled), marshalled = NULL;
+  
+  /* TODO merge */
+  
+  return 0;
+ fail:
+  saved_errno = errno;
+  if (fd >= 0)
+    close(fd);
+  free(marshalled);
+  for (i = 0; i < old_outputs_n; i++)
+    output_destroy(old_outputs + i);
+  free(old_outputs);
+  errno = saved_errno;
+  return -1;
+}
+
+
+/**
  * Print usage information and exit
  */
 static void usage(void)
@@ -1035,7 +1160,7 @@ static void usage(void)
 int main(int argc, char** argv)
 {
   int rc = 1, preserve = 0, foreground = 0, keep_stderr = 0, r;
-  char* statefile = NULL;
+  const char* statefile = NULL;
   
   ARGBEGIN
     {
@@ -1087,12 +1212,16 @@ int main(int argc, char** argv)
   
   if (statefile != NULL)
     {
-      /* TODO unmarshal */
+      if (unmarshal_and_merge_state(statefile) < 0)
+	goto fail;
+      unlink(statefile), statefile = NULL;
     }
   
   rc = 0;
  done:
-  destroy();
+  if (statefile)
+    unlink(statefile);
+  destroy(1);
   return rc;
  fail:
   if (errno != 0)
