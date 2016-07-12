@@ -45,23 +45,11 @@ extern size_t connections_ptr;
 extern size_t connections_used;
 
 /**
- * The server connection's message buffer
- */
-extern struct message server_message;
-
-/**
  * The clients' connections' message buffers
  */
 extern struct message* client_messages;
 
 
-
-/**
- * Initialise the state of the connections
- * 
- * @param  Zero on success, -1 on error
- */
-int server_initialise(void);
 
 /**
  * Destroy the state of the connections

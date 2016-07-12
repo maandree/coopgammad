@@ -51,11 +51,6 @@ size_t connections_ptr = 0;
 size_t connections_used = 0;
 
 /**
- * The server connection's message buffer
- */
-struct message server_message;
-
-/**
  * The clients' connections' message buffers
  */
 struct message* client_messages = NULL;
@@ -81,17 +76,6 @@ extern volatile sig_atomic_t terminate;
 
 
 /**
- * Initialise the state of the connections
- * 
- * @param  Zero on success, -1 on error
- */
-int server_initialise(void)
-{
-  return message_initialise(&server_message);
-}
-
-
-/**
  * Destroy the state of the connections
  * 
  * @param  disconnect  Disconnect all connections?
@@ -106,7 +90,6 @@ void server_destroy(int disconnect)
     if (connections[i] >= 0)
       message_destroy(client_messages + i);
   free(client_messages);
-  message_destroy(&server_message);
   free(connections);
 }
 
@@ -136,8 +119,6 @@ size_t server_marshal(void* buf)
     memcpy(bs + off, connections, connections_used * sizeof(*connections));
   off += connections_used * sizeof(*connections);
   
-  off += message_marshal(&server_message, bs ? bs + off : NULL);
-  
   for (i = 0; i < connections_used; i++)
     if (connections[i] >= 0)
       off += message_marshal(client_messages + i, bs ? bs + off : NULL);
@@ -159,7 +140,6 @@ size_t server_unmarshal(const void* buf)
   
   connections = NULL;
   client_messages = NULL;
-  memset(&server_message, 0, sizeof(server_message));
   
   connections_ptr = *(const size_t*)(bs + off);
   off += sizeof(size_t);
@@ -178,10 +158,6 @@ size_t server_unmarshal(const void* buf)
       if (client_messages == NULL)
 	return 0;
     }
-  
-  off += n = message_unmarshal(&server_message, bs + off);
-  if (n == 0)
-    return 0;
   
   for (i = 0; i < connections_used; i++)
     if (connections[i] >= 0)
@@ -220,30 +196,116 @@ static int update_fdset(fd_set* fds)
 
 
 /**
+ * Handle event on the server socket
+ * 
+ * @return  1: New connection accepted
+ *          0: Successful
+ *          -1: Failure
+ */
+static int handle_server(void)
+{
+  int fd;
+  
+  fd = accept(socketfd, NULL, NULL);
+  if (fd < 0)
+    switch (errno)
+      {
+      case EINTR:
+	return 0;
+      case ECONNABORTED:
+      case EINVAL:
+	terminate = 1;
+	return 0;
+      default:
+	return -1;
+      }
+  
+  if (connections_ptr == connections_alloc)
+    {
+      int* new;
+      new = realloc(connections, (connections_alloc + 10) * sizeof(*connections));
+      if (new == NULL)
+	return -1;
+      connections = new;
+      connections_alloc += 10;
+    }
+  
+  connections[connections_ptr++] = fd;
+  while (connections_ptr < connections_used)
+    if (connections[connections_ptr] >= 0)
+      connections_ptr++;
+  if (connections_used < connections_ptr)
+    connections_used = connections_ptr;
+  
+  return 1;
+}
+
+
+/**
+ * Handle event on a connection to a client
+ * 
+ * @param   conn  The index of the connection
+ * @return        1: New connection accepted
+ *                0: Successful
+ *                -1: Failure
+ */
+static int handle_connection(size_t conn)
+{
+  /* TODO */
+  return 0;
+}
+
+
+/**
  * The program's main loop
  * 
  * @return  Zero on success, -1 on error
  */
 int main_loop(void)
 {
-  fd_set fds_orig, fds_read, fds_err;
-  int fdn = update_fdset(&fds_orig);
+  fd_set fds_orig, fds_read, fds_ex;
+  int i, r, update, fdn = update_fdset(&fds_orig);
+  size_t j;
   
   while (!reexec && !terminate)
     {
       memcpy(&fds_read, &fds_orig, sizeof(fd_set));
-      memcpy(&fds_err, &fds_orig, sizeof(fd_set));
-      if (select(fdn, &fds_read, NULL, &fds_err, NULL) < 0)
+      memcpy(&fds_ex,   &fds_orig, sizeof(fd_set));
+      if (select(fdn, &fds_read, NULL, &fds_ex, NULL) < 0)
 	{
 	  if (errno == EINTR)
 	    continue;
-	  goto fail;
+	  return -1;
 	}
-      /* TODO */
+      
+      update = 0;
+      for (i = 0; i < fdn; i++)
+	if (FD_ISSET(i, &fds_read) || FD_ISSET(i, &fds_ex))
+	  {
+	    if (i == socketfd)
+	      r = handle_server();
+	    else
+	      {
+		for (j = 0;; j++)
+		  if (connections[j] == i)
+		    break;
+		r = handle_connection(j);
+	      }
+	    switch (r)
+	      {
+	      case 0:
+		break;
+	      case 1:
+		update = 1;
+		break;
+	      default:
+		return -1;
+	      }
+	  }
+      if (update)
+	update_fdset(&fds_orig);
     }
   
   return 0;
- fail:
-  return -1;
 }
 

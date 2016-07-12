@@ -87,14 +87,6 @@ char* socketpath = NULL;
 int gerror;
 
 /**
- * Initialisation stage
- * 
- * Used to keep track on what to destroy, of those things that
- * must only be destroyed if they have been initialised
- */
-int init_stage = 0;
-
-/**
  * The adjustment method, -1 for automatic
  */
 int method = -1;
@@ -740,14 +732,6 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
   if (signal(SIGTERM, sig_terminate) == SIG_ERR)
     goto fail;
   
-  if (full)
-    {
-      /* Initialise the server */
-      if (server_initialise() < 0)
-	goto fail;
-      init_stage++;
-    }
-  
   /* Place in the background unless -f */
   if (full && (foreground == 0))
     {
@@ -860,8 +844,6 @@ static void destroy(int full)
 {
   size_t i;
   
-  if (init_stage >= 1)
-    server_destroy(full);
   if (full && (socketfd >= 0))
     {
       shutdown(socketfd, SHUT_RDWR);
@@ -982,10 +964,6 @@ static size_t marshal(void* buf)
   off += server_marshal(bs ? bs + off : NULL);
   
   if (bs != NULL)
-    *(int*)(bs + off) = init_stage;
-  off += sizeof(int);
-  
-  if (bs != NULL)
     *(int*)(bs + off) = method;
   off += sizeof(int);
   
@@ -1060,9 +1038,6 @@ static size_t unmarshal(void* buf)
   off += n = server_unmarshal(bs + off);
   if (n == 0)
     return 0;
-  
-  init_stage = *(int*)(bs + off);
-  off += sizeof(int);
   
   method = *(int*)(bs + off);
   off += sizeof(int);
