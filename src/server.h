@@ -88,3 +88,10 @@ size_t server_marshal(void* buf);
  */
 size_t server_unmarshal(const void* buf);
 
+/**
+ * The program's main loop
+ * 
+ * @return  Zero on success, -1 on error
+ */
+int main_loop(void);
+

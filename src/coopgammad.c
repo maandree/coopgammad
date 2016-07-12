@@ -1271,6 +1271,9 @@ int main(int argc, char** argv)
       reexec = 0; /* See `if (reexec && !terminate)` */
     }
   
+  if (main_loop() < 0)
+    goto fail;
+  
   if (reexec && !terminate)
     {
       size_t buffer_size;

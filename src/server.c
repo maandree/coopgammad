@@ -18,7 +18,10 @@
 #include "server.h"
 #include "util.h"
 
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -57,10 +60,23 @@ struct message server_message;
  */
 struct message* client_messages = NULL;
 
+
 /**
  * The server socket's file descriptor
  */
 extern int socketfd;
+
+/**
+ * Has the process receive a signal
+ * telling it to re-execute?
+ */
+extern volatile sig_atomic_t reexec;
+
+/**
+ * Has the process receive a signal
+ * telling it to terminate?
+ */
+extern volatile sig_atomic_t terminate;
 
 
 
@@ -176,5 +192,58 @@ size_t server_unmarshal(const void* buf)
       }
   
   return off;
+}
+
+
+/**
+ * Sets the file descriptor set that includes
+ * the server socket and all connections
+ * 
+ * @param   fds  The file descritor set
+ * @return       The highest set file descritor plus 1
+ */
+static int update_fdset(fd_set* fds)
+{
+  int fdmax = socketfd;
+  size_t i;
+  FD_ZERO(fds);
+  FD_SET(socketfd, fds);
+  for (i = 0; i < connections_used; i++)
+    if (connections[i] >= 0)
+      {
+	FD_SET(connections[i], fds);
+	if (fdmax < connections[i])
+	  fdmax = connections[i];
+      }
+  return fdmax + 1;
+}
+
+
+/**
+ * The program's main loop
+ * 
+ * @return  Zero on success, -1 on error
+ */
+int main_loop(void)
+{
+  fd_set fds_orig, fds_read, fds_err;
+  int fdn = update_fdset(&fds_orig);
+  
+  while (!reexec && !terminate)
+    {
+      memcpy(&fds_read, &fds_orig, sizeof(fd_set));
+      memcpy(&fds_err, &fds_orig, sizeof(fd_set));
+      if (select(fdn, &fds_read, NULL, &fds_err, NULL) < 0)
+	{
+	  if (errno == EINTR)
+	    continue;
+	  goto fail;
+	}
+      /* TODO */
+    }
+  
+  return 0;
+ fail:
+  return -1;
 }
 
