@@ -323,32 +323,145 @@ static int connection_closed(int client)
 /**
  * Handle a ‘Command: enumerate-crtcs’ message
  * 
- * @param   conn  The index of the connection
- * @return        Zero on success (even if ignored), -1 on error
+ * @param   conn        The index of the connection
+ * @param   message_id  The value of the ‘Message ID’ header
+ * @return              Zero on success (even if ignored), -1 on error
  */
-static int enumerate_crtcs(size_t conn)
+static int enumerate_crtcs(size_t conn, char* message_id)
 {
-  /* TODO */ (void) conn;
+  size_t i, n = 0, len;
+  ssize_t m;
+  char* buf;
   
-  return 0;
+  if (message_id == NULL)
+    return fprintf(stderr, "%s: ignoring incomplete Command: enumerate-crtcs message\n", argv0), 0;
+  
+  for (i = 0; i < outputs_n; i++)
+    n += strlen(outputs[i].name) + 1;
+  
+  snprintf(NULL, 0,
+	   "In response to: %s\n"
+	   "Length: %zu\n"
+	   "\n%zn",
+	   message_id, n, &m);
+  
+  if (!(buf = malloc(n + (size_t)m)))
+    return -1;
+  
+  sprintf(buf,
+	  "In response to: %s\n"
+	  "Length: %zu\n"
+	  "\n",
+	  message_id, n);
+  
+  n = (size_t)m;
+  
+  for (i = 0; i < outputs_n; i++)
+    {
+      len = strlen(outputs[i].name);
+      memcpy(buf + n, outputs[i].name, len);
+      buf[n + len] = '\n';
+      n += len + 1;
+    }
+  
+  return send_message(conn, buf, n);
 }
 
 
 /**
  * Handle a ‘Command: set-gamma’ message
  * 
- * @param   conn  The index of the connection
- * @param   crtc  The value of the ‘CRTC’ header
- * @return        Zero on success (even if ignored), -1 on error
+ * @param   conn        The index of the connection
+ * @param   message_id  The value of the ‘Message ID’ header
+ * @param   crtc        The value of the ‘CRTC’ header
+ * @return              Zero on success (even if ignored), -1 on error
  */
-static int get_gamma_info(size_t conn, char* crtc)
+static int get_gamma_info(size_t conn, char* message_id, char* crtc)
 {
-  if (crtc == NULL)
+  struct output* output;
+  char* buf;
+  char depth[3];
+  const char* supported;
+  ssize_t n;
+  
+  if ((message_id == NULL) || (crtc == NULL))
     return fprintf(stderr, "%s: ignoring incomplete Command: get-gamma-info message\n", argv0), 0;
   
-  /* TODO */ (void) conn;
+  output = output_find_by_name(crtc, outputs, outputs_n);
+  if (output == NULL)
+    {
+      snprintf(NULL, 0,
+	       "Command: error\n"
+	       "In response to: %s\n"
+	       "Error: custom\n"
+	       "Length: 13\n"
+	       "\n"
+	       "No such CRTC\n%zn",
+	       message_id, &n);
+      
+      if (!(buf = malloc((size_t)n)))
+	return -1;
+      
+      sprintf(buf,
+	      "Command: error\n"
+	      "In response to: %s\n"
+	      "Error: custom\n"
+	      "Length: 13\n"
+	      "\n"
+	      "No such CRTC\n",
+	      message_id);
+      
+      return send_message(conn, buf, (size_t)n);
+    }
   
-  return 0;
+  switch (output->depth)
+    {
+    case -2:
+      sprintf(depth, "%s", "d");
+      break;
+    case -1:
+      sprintf(depth, "%s", "f");
+      break;
+    default:
+      sprintf(depth, "%i", output->depth);
+      break;
+    }
+  
+  switch (output->supported)
+    {
+    case LIBGAMMA_YES:  supported = "yes";    break;
+    case LIBGAMMA_NO:   supported = "no";     break;
+    default:            supported = "maybe";  break;
+    }
+  
+  snprintf(NULL, 0,
+	   "In response to: %s\n"
+	   "Cooperative: yes\n"
+	   "Depth: %s\n"
+	   "Red size: %zu\n"
+	   "Green size: %zu\n"
+	   "Blue size: %zu\n"
+	   "Gamma support: %s\n"
+	   "\n%zn",
+	   message_id, depth, output->red_size, output->green_size,
+	   output->blue_size, supported, &n);
+  
+  if (!(buf = malloc((size_t)n)))
+    return -1;
+  
+  sprintf(buf,
+	  "In response to: %s\n"
+	  "Cooperative: yes\n"
+	  "Depth: %s\n"
+	  "Red size: %zu\n"
+	  "Green size: %zu\n"
+	  "Blue size: %zu\n"
+	  "Gamma support: %s\n"
+	  "\n",
+	  message_id, depth, output->red_size, output->green_size,
+	  output->blue_size, supported);
+  
+  return send_message(conn, buf, (size_t)n);
 }
 
 
@@ -356,18 +469,28 @@ static int get_gamma_info(size_t conn, char* crtc)
  * Handle a ‘Command: get-gamma’ message
  * 
  * @param   conn           The index of the connection
+ * @param   message_id     The value of the ‘Message ID’ header
  * @param   crtc           The value of the ‘CRTC’ header
  * @param   coalesce       The value of the ‘Coalesce’ header
  * @param   high_priority  The value of the ‘High priority’ header
  * @param   low_priority   The value of the ‘Low priority’ header
  * @return                 Zero on success (even if ignored), -1 on error
  */
-static int get_gamma(size_t conn, char* crtc, char* coalesce, char* high_priority, char* low_priority)
+static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
+		     char* high_priority, char* low_priority)
 {
+  struct output* output;
   int64_t high, low;
   int coal;
+  char* buf;
+  ssize_t m;
+  size_t start, end, len, n, i;
+  char depth[3];
+  char tables[sizeof("Tables: \n") + 3 * sizeof(size_t)];
+  const char *error = NULL;
   
-  if ((crtc          == NULL) ||
+  if ((message_id    == NULL) ||
+      (crtc          == NULL) ||
       (coalesce      == NULL) ||
       (high_priority == NULL) ||
       (low_priority  == NULL))
@@ -384,9 +507,117 @@ static int get_gamma(size_t conn, char* crtc, char* coalesce, char* high_priorit
     return fprintf(stderr, "%s: ignoring Command: get-gamma message with bad Coalesce value: %s\n",
 		   argv0, coalesce), 0;
   
-  /* TODO */ (void) coal, (void) high, (void) low, (void) conn;
+  output = output_find_by_name(crtc, outputs, outputs_n);
+  if (output == NULL)
+    error = "No such CRTC";
+  else if (output->supported == LIBGAMMA_NO)
+    error = "CRTC does not support gamma ramps";
   
-  return 0;
+  if (error != NULL)
+    {
+      snprintf(NULL, 0,
+	       "Command: error\n"
+	       "In response to: %s\n"
+	       "Error: custom\n"
+	       "Length: %zu\n"
+	       "\n"
+	       "%s\n%zn",
+	       message_id, strlen(error) + 1, error, &m);
+      
+      if (!(buf = malloc((size_t)m)))
+	return -1;
+      
+      sprintf(buf,
+	      "Command: error\n"
+	      "In response to: %s\n"
+	      "Error: custom\n"
+	      "Length: %zu\n"
+	      "\n"
+	      "%s\n",
+	      message_id, strlen(error) + 1, error);
+      
+      return send_message(conn, buf, (size_t)m);
+    }
+  
+  for (start = 0; start < output->table_size; start++)
+    if (output->table_filters[start].priority <= high)
+      break;
+  
+  for (end = output->table_size; end > 0; end--)
+    if (output->table_filters[end - 1].priority >= low)
+      break;
+  
+  switch (output->depth)
+    {
+    case -2:
+      sprintf(depth, "%s", "d");
+      break;
+    case -1:
+      sprintf(depth, "%s", "f");
+      break;
+    default:
+      sprintf(depth, "%i", output->depth);
+      break;
+    }
+  
+  if (coal)
+    {
+      *tables = '\0';
+      n = output->ramps_size;
+    }
+  else
+    {
+      sprintf(tables, "Tables: %zu\n", end - start);
+      n = (sizeof(int64_t) + output->ramps_size) * (end - start);
+      for (i = start; i < end; i++)
+	n += strlen(output->table_filters[i].class) + 1;
+    }
+  
+  snprintf(NULL, 0,
+	   "In response to: %s\n"
+	   "Depth: %s\n"
+	   "Red size: %zu\n"
+	   "Green size: %zu\n"
+	   "Blue size: %zu\n"
+	   "%s"
+	   "Length: %zu\n"
+	   "\n%zn",
+	   message_id, depth, output->red_size, output->green_size,
+	   output->blue_size, tables, n, &m);
+  
+  if (!(buf = malloc(n + (size_t)m)))
+    return -1;
+  
+  sprintf(buf,
+	  "In response to: %s\n"
+	  "Depth: %s\n"
+	  "Red size: %zu\n"
+	  "Green size: %zu\n"
+	  "Blue size: %zu\n"
+	  "%s"
+	  "Length: %zu\n"
+	  "\n",
+	  message_id, depth, output->red_size, output->green_size,
+	  output->blue_size, tables, n);
+  
+  n = (size_t)m;
+  if (coal)
+    {
+      /* TODO coalesce */
+    }
+  else
+    for (i = start; i < end; i++)
+      {
+	*(int64_t*)(buf + n) = output->table_filters[i].priority;
+	n += sizeof(int64_t);
+	len = strlen(output->table_filters[i].class) + 1;
+	memcpy(buf + n, output->table_filters[i].class, len);
+	n += len;
+	memcpy(buf + n, output->table_filters[i].ramps, output->ramps_size);
+	n += output->ramps_size;
+      }
+  
+  return send_message(conn, buf, n);
 }
 
 
@@ -503,6 +734,7 @@ static int handle_connection(size_t conn)
   char* priority      = NULL;
   char* class         = NULL;
   char* lifespan      = NULL;
+  char* message_id    = NULL; /* Never report as superfluous */
   size_t i;
   
  again:
@@ -522,7 +754,7 @@ static int handle_connection(size_t conn)
 	default:
 	  return -1;
 	case ECONNRESET:;
-	  /* Fall throught to `case -2` in outer switch. */
+	  /* Fall throught to `case -2` in outer switch */
 	}
     case -2:
       shutdown(fd, SHUT_RDWR);
@@ -548,6 +780,7 @@ static int handle_connection(size_t conn)
       else if (strstr(header, "Priority: ")      == header)  priority      = strstr(header, ": ") + 2;
       else if (strstr(header, "Class: ")         == header)  class         = strstr(header, ": ") + 2;
       else if (strstr(header, "Lifespan: ")      == header)  lifespan      = strstr(header, ": ") + 2;
+      else if (strstr(header, "Message ID: ")    == header)  message_id    = strstr(header, ": ") + 2;
       else
 	fprintf(stderr, "%s: ignoring unrecognised header: %s\n", argv0, header);
     }
@@ -559,19 +792,19 @@ static int handle_connection(size_t conn)
     {
       if (crtc || coalesce || high_priority || low_priority || priority || class || lifespan)
 	fprintf(stderr, "%s: ignoring superfluous headers in Command: enumerate-crtcs message\n", argv0);
-      r = enumerate_crtcs(conn);
+      r = enumerate_crtcs(conn, message_id);
     }
   else if (!strcmp(command, "get-gamma-info"))
     {
       if (coalesce || high_priority || low_priority || priority || class || lifespan)
 	fprintf(stderr, "%s: ignoring superfluous headers in Command: get-gamma-info message\n", argv0);
-      r = get_gamma_info(conn, crtc);
+      r = get_gamma_info(conn, message_id, crtc);
     }
   else if (!strcmp(command, "get-gamma"))
     {
       if (priority || class || lifespan)
 	fprintf(stderr, "%s: ignoring superfluous headers in Command: get-gamma message\n", argv0);
-      r = get_gamma(conn, crtc, coalesce, high_priority, low_priority);
+      r = get_gamma(conn, message_id, crtc, coalesce, high_priority, low_priority);
     }
   else if (!strcmp(command, "set-gamma"))
     {
