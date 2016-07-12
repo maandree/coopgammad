@@ -954,7 +954,7 @@ static size_t marshal(void* buf)
   off += sizeof(size_t);
   
   for (i = 0; i < outputs_n; i++)
-    off += output_marshal(outputs + i , bs ? bs + off : NULL);
+    off += output_marshal(outputs + i, bs ? bs + off : NULL);
   
   if (bs != NULL)
     *(int*)(bs + off) = socketfd;
