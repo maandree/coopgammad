@@ -197,6 +197,7 @@ static char* get_pathname(const char* suffix)
 	if ((p = strrchr(name, ':')))
 	  if ((p = strchr(p, '.')))
 	    *p = '\0';
+	break;
       default:
 	break;
       }
@@ -497,6 +498,7 @@ static int create_pidfile(char* pidfile)
  * @param   preserve     Preserve current gamma ramps at priority 0
  * @param   foreground   Keep process in the foreground
  * @param   keep_stderr  Keep stderr open
+ * @param   query        Was -q used, see `main` for description
  * @return               1: Success
  *                       2: Normal failure
  *                       3: Libgamma failure
@@ -504,7 +506,7 @@ static int create_pidfile(char* pidfile)
  *                       Otherwise: The negative of the exit value the
  *                       process should have and shall exit immediately
  */
-static int initialise(int full, int preserve, int foreground, int keep_stderr)
+static int initialise(int full, int preserve, int foreground, int keep_stderr, int query)
 {
   struct sockaddr_un address;
   struct rlimit rlimit;
@@ -516,7 +518,7 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr)
   /* Zero out some memory so it can be destoried safely. */
   memset(&site, 0, sizeof(site));
   
-  if (full)
+  if (full && !query)
     {
       /* Close all file descriptors above stderr */
       if (getrlimit(RLIMIT_NOFILE, &rlimit) || (rlimit.rlim_cur == RLIM_INFINITY))
@@ -539,6 +541,10 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr)
   /* Get method */
   if ((method < 0) && (libgamma_list_methods(&method, 1, 0) < 1))
     return fprintf(stderr, "%s: no adjustment method available\n", argv0), -1;
+  
+  /* Go no further if we are just interested in the adjustment method and site */
+  if (query)
+    return 1;
   
   /* Get site */
   if (sitename != NULL)
@@ -1171,6 +1177,84 @@ static int unmarshal_and_merge_state(const char* statefile)
 
 
 /**
+ * Print the response for the -q option
+ * 
+ * @param   query  See -q for `main`, must be atleast 1
+ * @return         Zero on success, -1 on error
+ */
+static int print_method_and_site(int query)
+{
+  const char* methodname = NULL;
+  char* p;
+  
+  if (query == 1)
+    {
+      switch (method)
+	{
+	case LIBGAMMA_METHOD_DUMMY:                 methodname = "dummy";    break;
+	case LIBGAMMA_METHOD_X_RANDR:               methodname = "randr";    break;
+	case LIBGAMMA_METHOD_X_VIDMODE:             methodname = "vidmode";  break;
+	case LIBGAMMA_METHOD_LINUX_DRM:             methodname = "drm";      break;
+	case LIBGAMMA_METHOD_W32_GDI:               methodname = "gdi";      break;
+	case LIBGAMMA_METHOD_QUARTZ_CORE_GRAPHICS:  methodname = "quartz";   break;
+	default:
+	  if (printf("%i\n", method) < 0)
+	    return -1;
+	  break;
+	}
+      if (!methodname)
+	if (printf("%s\n", methodname) < 0)
+	  return -1;
+    }
+  
+  if (sitename == NULL)
+    {
+      sitename = libgamma_method_default_site(method);
+      if (sitename != NULL)
+	{
+	  sitename = memdup(sitename, strlen(sitename) + 1);
+	  if (sitename == NULL)
+	    return -1;
+	}
+    }
+  
+  if (sitename != NULL)
+    switch (method)
+      {
+      case LIBGAMMA_METHOD_X_RANDR:
+      case LIBGAMMA_METHOD_X_VIDMODE:
+	if ((p = strrchr(sitename, ':')))
+	  if ((p = strchr(p, '.')))
+	    *p = '\0';
+	break;
+      default:
+	break;
+      }
+  
+  if ((sitename != NULL) && (query == 1))
+    if (printf("%s\n", sitename) < 0)
+      return -1;
+  
+  if (query == 2)
+    {
+      site.method = method;
+      site.site = sitename, sitename = NULL;
+      socketpath = get_socket_pathname();
+      if (socketpath == NULL)
+	return -1;
+      if (printf("%s\n", socketpath) < 0)
+	return -1;
+    }
+  
+  if (close(STDOUT_FILENO) < 0)
+    if (errno != EINTR)
+      return -1;
+  
+  return 0;    
+}
+
+
+/**
  * Print usage information and exit
  */
 static void usage(void)
@@ -1203,13 +1287,26 @@ static void usage(void)
  *                    Do not fork the process into the background
  *                  -k
  *                    Keep stderr open
+ *                  -q
+ *                    Print the select (possiblity default) adjustment
+ *                    method on the first line in stdout, and the
+ *                    selected (possibility defasult) site on the second
+ *                    line in stdout, and exit. If the site name is `NULL`,
+ *                    the second line is omitted. This is indented to
+ *                    be used by clients to figure out to which instance
+ *                    of the service it should connect. Use twice to
+ *                    simply ge the socket pathname, an a terminating LF.
+ *                    By combining -q and -m you can enumerate the name
+ *                    of all recognised adjustment method, start from 0
+ *                    and work up until a numerical adjustment method is
+ *                    returned.
  * @return        0: Successful
  *                1: An error occurred
  *                2: Already running
  */
 int main(int argc, char** argv)
 {
-  int rc = 1, preserve = 0, foreground = 0, keep_stderr = 0, r;
+  int rc = 1, preserve = 0, foreground = 0, keep_stderr = 0, query = 0, r;
   char* statefile = NULL;
   char* statebuffer = NULL;
   
@@ -1236,6 +1333,9 @@ int main(int argc, char** argv)
     case 'k':
       keep_stderr = 1;
       break;
+    case 'q':
+      query = 1 + !!query;
+      break;
     case '#': /* Internal, do not document */
       statefile = EARGF(usage());
       break;
@@ -1248,7 +1348,7 @@ int main(int argc, char** argv)
   
  restart: /* If C had comefrom: comefrom reexec_failure; */
   
-  switch ((r = initialise(statefile == NULL, preserve, foreground, keep_stderr)))
+  switch ((r = initialise(statefile == NULL, preserve, foreground, keep_stderr, query)))
     {
     case 1:
       break;
@@ -1261,6 +1361,13 @@ int main(int argc, char** argv)
       goto fail;
     default:
       return -r;
+    }
+  
+  if (query)
+    {
+      if (print_method_and_site(query) < 0)
+	goto fail;
+      goto done;
     }
   
   if (statefile != NULL)
