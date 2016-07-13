@@ -660,13 +660,12 @@ static int set_gamma(size_t conn, char* crtc, char* priority, char* class, char*
   ssize_t r;
   
   if ((crtc     == NULL) ||
-      (priority == NULL) ||
       (class    == NULL) ||
       (lifespan == NULL))
     return fprintf(stderr, "%s: ignoring incomplete Command: set-gamma message\n", argv0), 0;
   
   filter.client   = connections[conn];
-  filter.priority = (int64_t)atoll(priority);
+  filter.priority = priority == NULL ? 0 : (int64_t)atoll(priority);
   filter.ramps    = NULL;
   
   output = output_find_by_name(crtc, outputs, outputs_n);
@@ -696,12 +695,17 @@ static int set_gamma(size_t conn, char* crtc, char* priority, char* class, char*
   if (filter.lifespan == LIFESPAN_REMOVE)
     {
       if (msg->payload_size)
-	fprintf(stderr, "%s: ignoring superfluous playload on Command: set-gamma message with "
+	fprintf(stderr, "%s: ignoring superfluous payload on Command: set-gamma message with "
+			"Lifespan: remove\n", argv0);
+      if (priority != NULL)
+	fprintf(stderr, "%s: ignoring superfluous Priority header on Command: set-gamma message with "
 			"Lifespan: remove\n", argv0);
     }
   else if (msg->payload_size != output->ramps_size)
     return fprintf(stderr, "%s: ignoring Command: set-gamma message bad payload: size: %zu instead of %zu\n",
 		   argv0, msg->payload_size, output->ramps_size), 0;
+  else if (priority == 0)
+    return fprintf(stderr, "%s: ignoring incomplete Command: set-gamma message\n", argv0), 0;
   
   filter.class = memdup(class, strlen(class) + 1);
   if (filter.class == NULL)
