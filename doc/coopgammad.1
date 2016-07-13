@@ -1,0 +1,109 @@
+.TH COOPGAMMAD 1 COOPGAMMAD
+.SH "NAME"
+coopgammad - Cooperative gamma server
+.SH "SYNPOSIS"
+.B coopgamma
+.RB [ -m
+.IR method ]
+.RB [ -s
+.IR site ]
+.RB [ -fkpq ]
+.SH "DESCRIPTION"
+Programs that desire to change the gamma adjustment
+on a display should use this program instead of
+talking directly with the display server (unless
+the display server is
+.BR mds ).
+By doing this, multiple programs can add filters to
+the display without overriding each others effects.
+.P
+By using
+.B coopgammad
+to apply adjustments, you can select whether the
+adjustment is persistent or shall be removed when
+your program disconnects from
+.BR coopgammad .
+Even if the adjustment is persistent it can be
+modified or removed later by another process.
+.SH "OPTIONS"
+.TP
+.B -f
+Don't fork the process to the background.
+If used, you can still detect when the
+process has been initialised be waiting
+for its stdout to close.
+.TP
+.B -k
+Do not close stderr when forking to the
+background.
+.TP
+\fB-m\fP \fIMETHOD\fP
+Adjustment method name or number. Recognised
+names include:
+
+.nf
+\fBdummy\fP      Dummy method
+\fBrandr\fP      X RAndR
+\fBvidmode\fP    X VidMode
+\fBdrm\fP        Linux DRM
+\fBgdi\fP        Windows GDI
+\fBquartz\fP     Quartz Core Graphics
+.fi
+
+The adjustment methods are supported via
+.BR libgamma (7).
+Only methods that were enabled when
+.B libgamma
+as compiled will be supported.
+.TP
+.B -p
+Add the current gamma adjustments to the
+filter list at priority 0. Even if this
+is not used, the gamma adjustments will
+not change for an output until a filter
+has been added for that output.
+.TP
+.B -q
+If used once, print the selected adjustment
+method for the first line to stdout, and
+if site's have names for that method, print
+the name of the selected site on the second
+line to stdout. The second line can be omitted
+if
+.B -s
+has not been used and the default site cannot
+be find.
+
+If used at least twice, print the pathname
+of the socket for the select method and site
+combination to stdout. Under unusual
+circumstances, the path may contain LF
+characters, but it will always be terminated
+by one extra LF to mark the end of the
+printed line.
+.TP
+\fB-s\fP \fISITE\fP
+Select the site to which to connect.
+For example
+.RB \(aq :0 \(aq,
+for local display 0 when using
+.BR X .
+.SH "SIGNALS"
+.TP
+.B SIGUSR1
+Reexecute the process to an updated version.
+.SH "RATIONALE"
+After reading the description section, the need for
+this should be obvious.
+.P
+I plan to reuse code written for this program when
+implementing
+.BR mds-coopgamma (1),
+therefore, the protocol is overly complicated,
+implementation-wise.
+.SH "SEE ALSO"
+.BR libcoopgamma (7),
+.BR cg-tools (7),
+.BR libgamma (7),
+.BR blueshift (1),
+.BR mds-coopgamma (1).

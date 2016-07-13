@@ -28,7 +28,7 @@ OPTIONS
 
 	-k
 		Do not close stderr when forking to the
-		background
+		background.
 
 	-m METHOD
 		Adjustment method name or number. Recognised
@@ -61,7 +61,7 @@ OPTIONS
 		if -s has not been used and the default site
 		cannot be find.
 
-		if used atleast twice, print the pathname
+		If used at least twice, print the pathname
 		of the socket for the select method and site
 		combination to stdout. Under unusual
 		circumstances, the path may contain LF
@@ -76,7 +76,7 @@ OPTIONS
 
 SIGNALS
 	SIGUSR1
-		Reexecute the process to an updated version
+		Reexecute the process to an updated version.
 
 RATIONALE
 	After reading the description section, the need for
@@ -84,7 +84,7 @@ RATIONALE
 
 	I plan to reuse code written for this program when
 	implementing mds-coopgamma(1), therefore, the
-	protocol is overly complicated.
+	protocol is overly complicated, implementation-wise.
 
 SEE ALSO
 	libcoopgamma(7), cg-tools(7), libgamma(7),
