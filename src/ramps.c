@@ -94,3 +94,47 @@ size_t gamma_ramps_unmarshal(union gamma_ramps* this, const void* buf, size_t ra
   return ramps_size;
 }
 
+
+/**
+ * Apply a ramp-trio on top of another ramp-trio
+ * 
+ * @param  dest         The output for the resulting ramp-trio, must be initialised
+ * @param  application  The red, green and blue ramps, as one single raw array,
+ *                      of the filter that should be applied
+ * @param  depth        -1: `float` stops
+ *                      -2: `double` stops
+ *                      Other: the number of bits of each (integral) stop
+ * @param  base         The CLUT on top of which the new filter should be applied,
+ *                      this can be the same pointer as `dest`
+ */
+void apply(union gamma_ramps* dest, void* application, int depth, union gamma_ramps* base)
+{
+  union gamma_ramps app;
+  size_t bytedepth;
+  size_t red_width, green_width, blue_width;
+  
+  if (depth == -1)
+    bytedepth = sizeof(float);
+  else if (depth == -2)
+    bytedepth = sizeof(double);
+  else
+    bytedepth = (size_t)depth / 8;
+  
+  red_width   = (app.u8.red_size   = base->u8.red_size)   * bytedepth;
+  green_width = (app.u8.green_size = base->u8.green_size) * bytedepth;
+  blue_width  = (app.u8.blue_size  = base->u8.blue_size)  * bytedepth;
+  
+  app.u8.red   = application;
+  app.u8.green = app.u8.red   + red_width;
+  app.u8.blue  = app.u8.green + green_width;
+  
+  if (dest != base)
+    {
+      memcpy(dest->u8.red,   base->u8.red,   red_width);
+      memcpy(dest->u8.green, base->u8.green, green_width);
+      memcpy(dest->u8.blue,  base->u8.blue,  blue_width);
+    }
+  
+  /* TODO apply with libclut */
+}
+

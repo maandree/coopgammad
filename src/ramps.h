@@ -81,3 +81,17 @@ size_t gamma_ramps_marshal(const union gamma_ramps* this, void* buf, size_t ramp
  */
 size_t gamma_ramps_unmarshal(union gamma_ramps* this, const void* buf, size_t ramps_size);
 
+/**
+ * Apply a ramp-trio on top of another ramp-trio
+ * 
+ * @param  dest         The output for the resulting ramp-trio, must be initialised
+ * @param  application  The red, green and blue ramps, as one single raw array,
+ *                      of the filter that should be applied
+ * @param  depth        -1: `float` stops
+ *                      -2: `double` stops
+ *                      Other: the number of bits of each (integral) stop
+ * @param  base         The CLUT on top of which the new filter should be applied,
+ *                      this can be the same pointer as `dest`
+ */
+void apply(union gamma_ramps* dest, void* application, int depth, union gamma_ramps* base);
+

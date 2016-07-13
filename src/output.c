@@ -24,6 +24,13 @@
 
 
 /**
+ * The name of the process
+ */
+extern char* argv0;
+
+
+
+/**
  * Free all resources allocated to an output.
  * The allocation of `output` itself is not freed,
  * nor is its the libgamma destroyed.
@@ -310,7 +317,7 @@ ssize_t add_filter(struct output* out, struct filter* filter)
 
 /**
  * Recalculate the resulting gamma and
- * update push the new gamam ramps to the CRTC
+ * update push the new gamma ramps to the CRTC
  * 
  * @param   output         The output
  * @param   first_updated  The index of the first added or removed filter
@@ -318,7 +325,87 @@ ssize_t add_filter(struct output* out, struct filter* filter)
  */
 int flush_filters(struct output* output, size_t first_updated)
 {
-  /* TODO */ (void) output, (void) first_updated;
+  union gamma_ramps plain;
+  union gamma_ramps* last;
+  size_t i;
+  int r = 0;
+  
+  if (first_updated == 0)
+    {
+      if (make_plain_ramps(&plain, output) < 0)
+	return -1;
+      last = &plain;
+    }
+  else
+    last = output->table_sums + (first_updated - 1);
+  
+  for (i = first_updated; i < output->table_size; i++)
+    {
+      apply(output->table_sums + i, output->table_filters[i].ramps, output->depth, last);
+      last = output->table_sums + i;
+    }
+  
+  switch (output->depth)
+    {
+    case  8:  r = libgamma_crtc_set_gamma_ramps8(output->crtc,  last->u8);   break;
+    case 16:  r = libgamma_crtc_set_gamma_ramps16(output->crtc, last->u16);  break;
+    case 32:  r = libgamma_crtc_set_gamma_ramps32(output->crtc, last->u32);  break;
+    case 64:  r = libgamma_crtc_set_gamma_ramps64(output->crtc, last->u64);  break;
+    case -1:  r = libgamma_crtc_set_gamma_rampsf(output->crtc,  last->f);    break;
+    case -2:  r = libgamma_crtc_set_gamma_rampsd(output->crtc,  last->d);    break;
+    default:
+      abort();
+    }
+  if (r)
+    libgamma_perror(argv0, r); /* Not fatal */
+  
+  if (first_updated == 0)
+    libgamma_gamma_ramps8_destroy(&(plain.u8));
+  
+  return 0;
+}
+
+
+/**
+ * Make identity mapping ramps
+ * 
+ * @param   ramps   Output parameter for the ramps
+ * @param   output  The output for which the ramps shall be configured
+ * @return          Zero on success, -1 on error
+ */
+int make_plain_ramps(union gamma_ramps* ramps, struct output* output)
+{
+  COPY_RAMP_SIZES(&(ramps->u8), output);
+  switch (output->depth)
+    {
+    case 8:
+      if (libgamma_gamma_ramps8_initialise(&(ramps->u8)))
+	return -1;
+      break;
+    case 16:
+      if (libgamma_gamma_ramps16_initialise(&(ramps->u16)))
+	return -1;
+      break;
+    case 32:
+      if (libgamma_gamma_ramps32_initialise(&(ramps->u32)))
+	return -1;
+      break;
+    case 64:
+      if (libgamma_gamma_ramps64_initialise(&(ramps->u64)))
+	return -1;
+      break;
+    case -1:
+      if (libgamma_gamma_rampsf_initialise(&(ramps->f)))
+	return -1;
+      break;
+    case -2:
+      if (libgamma_gamma_rampsd_initialise(&(ramps->d)))
+	return -1;
+      break;
+    default:
+      abort();
+    }
+  /* TODO fill ramps (use libclut) */
   return 0;
 }
 

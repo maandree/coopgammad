@@ -199,11 +199,20 @@ ssize_t add_filter(struct output* output, struct filter* filter);
 
 /**
  * Recalculate the resulting gamma and
- * update push the new gamam ramps to the CRTC
+ * update push the new gamma ramps to the CRTC
  * 
  * @param   output         The output
  * @param   first_updated  The index of the first added or removed filter
  * @return                 Zero on success, -1 on error
  */
 int flush_filters(struct output* output, size_t first_updated);
+
+/**
+ * Make identity mapping ramps
+ * 
+ * @param   ramps   Output parameter for the ramps
+ * @param   output  The output for which the ramps shall be configured
+ * @return          Zero on success, -1 on error
+ */
+int make_plain_ramps(union gamma_ramps* ramps, struct output* output);
 

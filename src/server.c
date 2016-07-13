@@ -603,7 +603,24 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
   n = (size_t)m;
   if (coal)
     {
-      /* TODO coalesce */
+      if (start == 0)
+	memcpy(buf + n, output->table_sums[end].u8.red, output->ramps_size);
+      else
+	{
+	  union gamma_ramps ramps;
+	  if (make_plain_ramps(&ramps, output))
+	    {
+	      int saved_errno = errno;
+	      free(buf);
+	      errno = saved_errno;
+	      return -1;
+	    }
+	  for (i = start; i < end; i++)
+	    apply(&ramps, output->table_filters[i].ramps, output->depth, &ramps);
+	  memcpy(buf + n, ramps.u8.red, output->ramps_size);
+	  libgamma_gamma_ramps8_destroy(&(ramps.u8));
+	}
+      n += output->ramps_size;
     }
   else
     for (i = start; i < end; i++)
