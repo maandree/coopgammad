@@ -18,6 +18,7 @@
 #include "output.h"
 #include "util.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -273,7 +274,11 @@ static ssize_t remove_filter(struct output* out, struct filter* filter)
       break;
   
   if (i == out->table_size)
-    return (ssize_t)(out->table_size);
+    {
+      fprintf(stderr, "%s: ignoring attempt to removing non-existing filter on CRTC %s: %s",
+	      argv0, out->name, filter->class);
+      return (ssize_t)(out->table_size);
+    }
   
   filter_destroy(out->table_filters + i);
   libgamma_gamma_ramps8_destroy(&(out->table_sums[i].u8));
