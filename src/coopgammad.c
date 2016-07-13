@@ -1233,7 +1233,7 @@ static int print_method_and_site(int query)
  */
 static void usage(void)
 {
-  printf("Usage: %s [-m method] [-s site] [-kfp]\n", argv0);
+  printf("Usage: %s [-m method] [-s site] [-fkpq]\n", argv0);
   exit(1);
 }
 
