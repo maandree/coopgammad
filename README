@@ -87,4 +87,5 @@ RATIONALE
 	protocol is overly complicated.
 
 SEE ALSO
-	libgamma(7), blueshift(1), mds-coopgamma(1)
+	libcoopgamma(7), cg-tools(7), libgamma(7),
+	blueshift(1), mds-coopgamma(1)
