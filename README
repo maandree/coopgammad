@@ -79,7 +79,7 @@ SIGNALS
 		Reexecute the process to an updated version
 
 RATIONALE
-	Of reading the description section, the need for
+	After reading the description section, the need for
 	this should be obvious.
 
 	I plan to reuse code written for this program when
