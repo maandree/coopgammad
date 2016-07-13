@@ -18,6 +18,8 @@
 #include "output.h"
 #include "util.h"
 
+#include <libclut.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -432,31 +434,36 @@ int make_plain_ramps(union gamma_ramps* ramps, struct output* output)
     case 8:
       if (libgamma_gamma_ramps8_initialise(&(ramps->u8)))
 	return -1;
+      libclut_start_over(&(ramps->u8), UINT8_MAX, uint8_t, 1, 1, 1);
       break;
     case 16:
       if (libgamma_gamma_ramps16_initialise(&(ramps->u16)))
 	return -1;
+      libclut_start_over(&(ramps->u16), UINT16_MAX, uint16_t, 1, 1, 1);
       break;
     case 32:
       if (libgamma_gamma_ramps32_initialise(&(ramps->u32)))
 	return -1;
+      libclut_start_over(&(ramps->u32), UINT32_MAX, uint32_t, 1, 1, 1);
       break;
     case 64:
       if (libgamma_gamma_ramps64_initialise(&(ramps->u64)))
 	return -1;
+      libclut_start_over(&(ramps->u64), UINT64_MAX, uint64_t, 1, 1, 1);
       break;
     case -1:
       if (libgamma_gamma_rampsf_initialise(&(ramps->f)))
 	return -1;
+      libclut_start_over(&(ramps->f), 1.0f, float, 1, 1, 1);
       break;
     case -2:
       if (libgamma_gamma_rampsd_initialise(&(ramps->d)))
 	return -1;
+      libclut_start_over(&(ramps->d), (double)1, double, 1, 1, 1);
       break;
     default:
       abort();
     }
-  /* TODO fill ramps (use libclut) */
   return 0;
 }
 

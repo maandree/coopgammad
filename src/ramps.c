@@ -17,6 +17,8 @@
  */
 #include "ramps.h"
 
+#include <libclut.h>
+
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -135,6 +137,28 @@ void apply(union gamma_ramps* dest, void* application, int depth, union gamma_ra
       memcpy(dest->u8.blue,  base->u8.blue,  blue_width);
     }
   
-  /* TODO apply with libclut */
+  switch (depth)
+    {
+    case 8:
+      libclut_apply(&(dest->u8), UINT8_MAX, uint8_t, &(app.u8), UINT8_MAX, uint8_t, 1, 1, 1);
+      break;
+    case 16:
+      libclut_apply(&(dest->u16), UINT16_MAX, uint16_t, &(app.u16), UINT16_MAX, uint16_t, 1, 1, 1);
+      break;
+    case 32:
+      libclut_apply(&(dest->u32), UINT32_MAX, uint32_t, &(app.u32), UINT32_MAX, uint32_t, 1, 1, 1);
+      break;
+    case 64:
+      libclut_apply(&(dest->u64), UINT64_MAX, uint64_t, &(app.u64), UINT64_MAX, uint64_t, 1, 1, 1);
+      break;
+    case -1:
+      libclut_apply(&(dest->f), 1.0f, float, &(app.d), 1.0f, float, 1, 1, 1);
+      break;
+    case -2:
+      libclut_apply(&(dest->d), (double)1, double, &(app.f), (double)1, double, 1, 1, 1);
+      break;
+    default:
+      abort();
+    }
 }
 
