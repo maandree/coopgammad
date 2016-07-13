@@ -3,7 +3,7 @@ COMMAND = coopgammad
 
 KERNEL = $(shell uname | tr '[A-Z]_' '[a-z]-')
 
-SRC = filter coopgammad output ramps util message server
+SRC = filter coopgammad output ramps util message server ring
 
 OPTIMISE = -Og -g
 
