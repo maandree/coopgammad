@@ -16,6 +16,7 @@
  * along with this library.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "message.h"
+#include "ring.h"
 
 #include <stddef.h>
 
@@ -45,9 +46,14 @@ extern size_t connections_ptr;
 extern size_t connections_used;
 
 /**
- * The clients' connections' message buffers
+ * The clients' connections' inbound-message buffers
  */
-extern struct message* client_messages;
+extern struct message* inbound;
+
+/**
+ * The clients' connections' outbound-message buffers
+ */
+extern struct ring* outbound;
 
 
 

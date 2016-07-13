@@ -113,3 +113,15 @@ void* ring_peek(struct ring* this, size_t* n);
  */
 void ring_pop(struct ring* this, size_t n);
 
+/**
+ * Check whether there is more data waiting
+ * in a ring buffer
+ * 
+ * @param   this  The ring buffer
+ * @return        1 if there is more data, 0 otherwise
+ */
+static inline int ring_have_more(struct ring* this)
+{
+  return this->buffer != NULL;
+}
+
