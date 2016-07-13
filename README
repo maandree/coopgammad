@@ -21,7 +21,7 @@ DESCRIPTION
 
 OPTIONS
 	-f
-		Done fork the process to the background.
+		Don't fork the process to the background.
 		If used, you can still detect when the
 		process has been initialised be waiting
 		for its stdout to close.
