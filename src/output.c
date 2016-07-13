@@ -258,6 +258,36 @@ struct output* output_find_by_name(const char* key, struct output* base, size_t 
 
 
 /**
+ * Remove a filter from an output
+ * 
+ * @param   out     The output
+ * @param   filter  The filter
+ * @return          The index of the filter, `out->table_size` if not found
+ */
+static ssize_t remove_filter(struct output* out, struct filter* filter)
+{
+  size_t i, n = out->table_size;
+  
+  for (i = 0; i < n; i++)
+    if (!strcmp(filter->class, out->table_filters[i].class))
+      break;
+  
+  if (i == out->table_size)
+    return (ssize_t)(out->table_size);
+  
+  filter_destroy(out->table_filters + i);
+  libgamma_gamma_ramps8_destroy(&(out->table_sums[i].u8));
+  
+  n = n - i - 1;
+  memmove(out->table_filters + i, out->table_filters + i + 1, n * sizeof(*(out->table_filters)));
+  memmove(out->table_sums    + i, out->table_sums    + i + 1, n * sizeof(*(out->table_sums)));
+  out->table_size--;
+  
+  return (ssize_t)i;
+}
+
+
+/**
  * Add a filter to an output
  * 
  * @param   out     The output
@@ -268,6 +298,9 @@ ssize_t add_filter(struct output* out, struct filter* filter)
 {
   size_t i, n = out->table_size;
   int r = -1;
+  
+  if (filter->lifespan == LIFESPAN_REMOVE)
+    return remove_filter(out, filter);
   
   for (i = 0; i < n; i++)
     if (filter->priority > out->table_filters[i].priority)
