@@ -299,9 +299,22 @@ ssize_t add_filter(struct output* out, struct filter* filter)
   size_t i, n = out->table_size;
   int r = -1;
   
+  /* Remove? */
   if (filter->lifespan == LIFESPAN_REMOVE)
     return remove_filter(out, filter);
   
+  /* Update? */
+  for (i = 0; i < n; i++)
+    if (!strcmp(filter->class, out->table_filters[i].class))
+      break;
+  if (i != n)
+    {
+      filter_destroy(out->table_filters + i);
+      out->table_filters[i] = *filter;
+      return (ssize_t)i;
+    }
+  
+  /* Add! */
   for (i = 0; i < n; i++)
     if (filter->priority > out->table_filters[i].priority)
       break;
