@@ -301,6 +301,7 @@ static int connection_closed(int client)
       for (j = k = 0; j < output->table_size; j += !remove, k++)
 	{
 	  remove = output->table_filters[j].client == client;
+	  remove = remove && (output->table_filters[j].lifespan == LIFESPAN_UNTIL_DEATH);
 	  if (remove)
 	    {
 	      filter_destroy(output->table_filters + j);
