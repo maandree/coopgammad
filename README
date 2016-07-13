@@ -1,0 +1,90 @@
+NAME
+	coopgammad - Cooperative gamma server
+
+SYNOPSIS
+	coopgammad [-m method] [-s site] [-fkpq]
+
+DESCRIPTION
+	Programs that desire to change the gamma adjustment
+	on a display should use this program instead of
+	talking directly with the display server (unless
+	the display server is mds). By doing this, multiple
+	programs can add filters to the display without
+	overriding each others effects.
+
+	By using coopgammad to apply adjustments, you can
+	select whether the adjustment is persistent or
+	shall be removed when your program disconnects
+	from coopgammad. Even if the adjustment is persistent
+	it can be modified or removed later by another
+	process.
+
+OPTIONS
+	-f
+		Done fork the process to the background.
+		If used, you can still detect when the
+		process has been initialised be waiting
+		for its stdout to close.
+
+	-k
+		Do not close stderr when forking to the
+		background
+
+	-m METHOD
+		Adjustment method name or number. Recognised
+		names include:
+
+		dummy      Dummy method
+		randr      X RAndR
+		vidmode    X VidMode
+		drm        Linux DRM
+		gdi        Windows GDI
+		quartz     Quartz Core Graphics
+
+		The adjustment methods are supported via
+		libgamma(7). Only methods that were enabled
+		when libgamma as compiled will be supported.
+
+	-p
+		Add the current gamma adjustments to the
+		filter list at priority 0. Even if this
+		is not used, the gamma adjustments will
+		not change for an output until a filter
+		has been added for that output.
+
+	-q
+		If used once, print the selected adjustment
+		method for the first line to stdout, and
+		if site's have names for that method, print
+		the name of the selected site on the second
+		line to stdout. The second line can be omitted
+		if -s has not been used and the default site
+		cannot be find.
+
+		if used atleast twice, print the pathname
+		of the socket for the select method and site
+		combination to stdout. Under unusual
+		circumstances, the path may contain LF
+		characters, but it will always be terminated
+		by one extra LF to mark the end of the
+		printed line.
+
+	-s SITE
+		Select the site to which to connect.
+		For example ':0', for local display 0 when
+		using X.
+
+SIGNALS
+	SIGUSR1
+		Reexecute the process to an updated version
+
+RATIONALE
+	Of reading the description section, the need for
+	this should be obvious.
+
+	I plan to reuse code written for this program when
+	implementing mds-coopgamma(1), therefore, the
+	protocol is overly complicated.
+
+SEE ALSO
+	libgamma(7), blueshift(1), mds-coopgamma(1)
