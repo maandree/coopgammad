@@ -2,18 +2,18 @@
  * coopgammad -- Cooperative gamma server
  * Copyright (C) 2016  Mattias Andrée (maandree@kth.se)
  * 
- * This library is free software: you can redistribute it and/or modify
+ * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  * 
- * This library is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  * 
  * You should have received a copy of the GNU General Public License
- * along with this library.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <libgamma.h>
 
@@ -817,8 +817,8 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
     {
       /* Signal the spawner that the service is ready */
       close(STDOUT_FILENO);
-      /* Avoid potential catastrophes that would occur if a library that is being
-       * used was so mindless as to write to stdout. */
+      /* Avoid potential catastrophes that would occur if a library
+       * that is being used was so mindless as to write to stdout. */
       if (dup2(STDERR_FILENO, STDOUT_FILENO) < 0)
 	perror(argv0);
     }
