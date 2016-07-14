@@ -100,6 +100,30 @@ extern size_t outputs_n;
 
 
 /**
+ * Construct a message
+ * 
+ * @param  bufp:char**            Output parameter for the buffer, must not have side-effects
+ * @param  np:size_t*             Output parameter for the size of the buffer sans `extra`
+ * @param  extra:size_t           The extra number for bytes to allocate to the buffer
+ * @param  format:string-literal  Message format string
+ * @param  ...                    Message formatting arguments
+ */
+#define MAKE_MESSAGE(bufp, np, extra, format, ...)		\
+  do								\
+    {								\
+      ssize_t m__;						\
+      snprintf(NULL, 0, format "%zn", __VA_ARGS__, &m__);	\
+      *(bufp) = malloc((size_t)(extra) + (size_t)m__);		\
+      if (*(bufp) == NULL)					\
+	return -1;						\
+      sprintf(*(bufp), format, __VA_ARGS__);			\
+      *(np) = (size_t)m__;					\
+    }								\
+  while (0)
+
+
+
+/**
  * Destroy the state of the connections
  * 
  * @param  disconnect  Disconnect all connections?
@@ -458,7 +482,6 @@ static inline int continue_send(size_t conn)
 static int enumerate_crtcs(size_t conn, char* message_id)
 {
   size_t i, n = 0, len;
-  ssize_t m;
   char* buf;
   
   if (message_id == NULL)
@@ -467,22 +490,11 @@ static int enumerate_crtcs(size_t conn, char* message_id)
   for (i = 0; i < outputs_n; i++)
     n += strlen(outputs[i].name) + 1;
   
-  snprintf(NULL, 0,
-	   "In response to: %s\n"
-	   "Length: %zu\n"
-	   "\n%zn",
-	   message_id, n, &m);
-  
-  if (!(buf = malloc(n + (size_t)m)))
-    return -1;
-  
-  sprintf(buf,
-	  "In response to: %s\n"
-	  "Length: %zu\n"
-	  "\n",
-	  message_id, n);
-  
-  n = (size_t)m;
+  MAKE_MESSAGE(&buf, &n, 0,
+	       "In response to: %s\n"
+	       "Length: %zu\n"
+	       "\n",
+	       message_id, n);
   
   for (i = 0; i < outputs_n; i++)
     {
@@ -511,7 +523,7 @@ static int get_gamma_info(size_t conn, char* message_id, char* crtc)
   char* buf;
   char depth[3];
   const char* supported;
-  ssize_t n;
+  size_t n;
   
   if ((message_id == NULL) || (crtc == NULL))
     return fprintf(stderr, "%s: ignoring incomplete Command: get-gamma-info message\n", argv0), 0;
@@ -519,28 +531,16 @@ static int get_gamma_info(size_t conn, char* message_id, char* crtc)
   output = output_find_by_name(crtc, outputs, outputs_n);
   if (output == NULL)
     {
-      snprintf(NULL, 0,
-	       "Command: error\n"
-	       "In response to: %s\n"
-	       "Error: custom\n"
-	       "Length: 13\n"
-	       "\n"
-	       "No such CRTC\n%zn",
-	       message_id, &n);
+      MAKE_MESSAGE(&buf, &n, 0,
+		   "Command: error\n"
+		   "In response to: %s\n"
+		   "Error: custom\n"
+		   "Length: 13\n"
+		   "\n"
+		   "No such CRTC\n",
+		   message_id);
       
-      if (!(buf = malloc((size_t)n)))
-	return -1;
-      
-      sprintf(buf,
-	      "Command: error\n"
-	      "In response to: %s\n"
-	      "Error: custom\n"
-	      "Length: 13\n"
-	      "\n"
-	      "No such CRTC\n",
-	      message_id);
-      
-      return send_message(conn, buf, (size_t)n);
+      return send_message(conn, buf, n);
     }
   
   switch (output->depth)
@@ -563,34 +563,19 @@ static int get_gamma_info(size_t conn, char* message_id, char* crtc)
     default:            supported = "maybe";  break;
     }
   
-  snprintf(NULL, 0,
-	   "In response to: %s\n"
-	   "Cooperative: yes\n"
-	   "Depth: %s\n"
-	   "Red size: %zu\n"
-	   "Green size: %zu\n"
-	   "Blue size: %zu\n"
-	   "Gamma support: %s\n"
-	   "\n%zn",
-	   message_id, depth, output->red_size, output->green_size,
-	   output->blue_size, supported, &n);
+  MAKE_MESSAGE(&buf, &n, 0,
+	       "In response to: %s\n"
+	       "Cooperative: yes\n"
+	       "Depth: %s\n"
+	       "Red size: %zu\n"
+	       "Green size: %zu\n"
+	       "Blue size: %zu\n"
+	       "Gamma support: %s\n"
+	       "\n",
+	       message_id, depth, output->red_size, output->green_size,
+	       output->blue_size, supported);
   
-  if (!(buf = malloc((size_t)n)))
-    return -1;
-  
-  sprintf(buf,
-	  "In response to: %s\n"
-	  "Cooperative: yes\n"
-	  "Depth: %s\n"
-	  "Red size: %zu\n"
-	  "Green size: %zu\n"
-	  "Blue size: %zu\n"
-	  "Gamma support: %s\n"
-	  "\n",
-	  message_id, depth, output->red_size, output->green_size,
-	  output->blue_size, supported);
-  
-  return send_message(conn, buf, (size_t)n);
+  return send_message(conn, buf, n);
 }
 
 
@@ -613,7 +598,6 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
   int64_t high, low;
   int coal;
   char* buf;
-  ssize_t m;
   size_t start, end, len, n, i;
   char depth[3];
   char tables[sizeof("Tables: \n") + 3 * sizeof(size_t)];
@@ -645,28 +629,16 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
   
   if (error != NULL)
     {
-      snprintf(NULL, 0,
-	       "Command: error\n"
-	       "In response to: %s\n"
-	       "Error: custom\n"
-	       "Length: %zu\n"
-	       "\n"
-	       "%s\n%zn",
-	       message_id, strlen(error) + 1, error, &m);
+      MAKE_MESSAGE(&buf, &n, 0,
+		   "Command: error\n"
+		   "In response to: %s\n"
+		   "Error: custom\n"
+		   "Length: %zu\n"
+		   "\n"
+		   "%s\n",
+		   message_id, strlen(error) + 1, error);
       
-      if (!(buf = malloc((size_t)m)))
-	return -1;
-      
-      sprintf(buf,
-	      "Command: error\n"
-	      "In response to: %s\n"
-	      "Error: custom\n"
-	      "Length: %zu\n"
-	      "\n"
-	      "%s\n",
-	      message_id, strlen(error) + 1, error);
-      
-      return send_message(conn, buf, (size_t)m);
+      return send_message(conn, buf, n);
     }
   
   for (start = 0; start < output->table_size; start++)
@@ -703,34 +675,18 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
 	n += strlen(output->table_filters[i].class) + 1;
     }
   
-  snprintf(NULL, 0,
-	   "In response to: %s\n"
-	   "Depth: %s\n"
-	   "Red size: %zu\n"
-	   "Green size: %zu\n"
-	   "Blue size: %zu\n"
-	   "%s"
-	   "Length: %zu\n"
-	   "\n%zn",
-	   message_id, depth, output->red_size, output->green_size,
-	   output->blue_size, tables, n, &m);
+  MAKE_MESSAGE(&buf, &n, 0,
+	       "In response to: %s\n"
+	       "Depth: %s\n"
+	       "Red size: %zu\n"
+	       "Green size: %zu\n"
+	       "Blue size: %zu\n"
+	       "%s"
+	       "Length: %zu\n"
+	       "\n",
+	       message_id, depth, output->red_size, output->green_size,
+	       output->blue_size, tables, n);
   
-  if (!(buf = malloc(n + (size_t)m)))
-    return -1;
-  
-  sprintf(buf,
-	  "In response to: %s\n"
-	  "Depth: %s\n"
-	  "Red size: %zu\n"
-	  "Green size: %zu\n"
-	  "Blue size: %zu\n"
-	  "%s"
-	  "Length: %zu\n"
-	  "\n",
-	  message_id, depth, output->red_size, output->green_size,
-	  output->blue_size, tables, n);
-  
-  n = (size_t)m;
   if (coal)
     {
       if (start == 0)
