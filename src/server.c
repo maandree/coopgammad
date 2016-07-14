@@ -120,7 +120,7 @@ extern size_t outputs_n;
       *(np) = (size_t)m__;					\
     }								\
   while (0)
-
+  
 
 
 /**
@@ -469,6 +469,82 @@ static inline int continue_send(size_t conn)
 {
   return send_message(conn, NULL, 0);
 }
+
+
+/**
+ * Send a custom error without an error number
+ * 
+ * @param   ...  The error description to send
+ * @return       1: Client disconnected
+ *               0: Success (possibily delayed)
+ *               -1: An error occurred
+ */
+#define send_error(...)  ((send_error)(conn, message_id, __VA_ARGS__))
+
+
+/**
+ * Send a custom error without an error number
+ * 
+ * @param   conn        The index of the connection
+ * @param   message_id  The ID of the message to which this message is a response
+ * @param   desc        The error description to send
+ * @return              1: Client disconnected
+ *                      0: Success (possibily delayed)
+ *                      -1: An error occurred
+ */
+static int (send_error)(size_t conn, const char* message_id, const char* desc)
+{
+  char* buf;
+  size_t n;
+  
+  MAKE_MESSAGE(&buf, &n, 0,
+	       "Command: error\n"
+	       "In response to: %s\n"
+	       "Error: custom\n"
+	       "Length: %zu\n"
+	       "\n"
+	       "%s\n",
+	       message_id, strlen(desc) + 1, desc);
+  
+  return send_message(conn, buf, n);
+}
+
+
+/**
+ * Send a standard error
+ * 
+ * @param   ...  The value of `errno`, 0 to indicate success
+ * @return       1: Client disconnected
+ *               0: Success (possibily delayed)
+ *               -1: An error occurred
+ */
+#define send_errno(...)  ((send_errno)(conn, message_id, __VA_ARGS__))
+
+
+/**
+ * Send a standard error
+ * 
+ * @param   conn        The index of the connection
+ * @param   message_id  The ID of the message to which this message is a response
+ * @param   number      The value of `errno`, 0 to indicate success
+ * @return              1: Client disconnected
+ *                      0: Success (possibily delayed)
+ *                      -1: An error occurred
+ */
+static int (send_errno)(size_t conn, const char* message_id, int number)
+{
+  char* buf;
+  size_t n;
+  
+  MAKE_MESSAGE(&buf, &n, 0,
+	       "Command: error\n"
+	       "In response to: %s\n"
+	       "Error: %i\n"
+	       "\n",
+	       message_id, number);
+  
+  return send_message(conn, buf, n);
+}
   
 
 /**
@@ -522,23 +598,11 @@ static int get_gamma_info(size_t conn, char* message_id, char* crtc)
   const char* supported;
   size_t n;
   
-  if (crtc == NULL)
-    return fprintf(stderr, "%s: ignoring incomplete Command: get-gamma-info message\n", argv0), 0;
+  if (crtc  == NULL)  return send_error("protocol error: 'CRTC' header omitted");
   
   output = output_find_by_name(crtc, outputs, outputs_n);
   if (output == NULL)
-    {
-      MAKE_MESSAGE(&buf, &n, 0,
-		   "Command: error\n"
-		   "In response to: %s\n"
-		   "Error: custom\n"
-		   "Length: 13\n"
-		   "\n"
-		   "No such CRTC\n",
-		   message_id);
-      
-      return send_message(conn, buf, n);
-    }
+    return send_error("selected CRTC does not exist");
   
   switch (output->depth)
     {
@@ -598,13 +662,11 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
   size_t start, end, len, n, i;
   char depth[3];
   char tables[sizeof("Tables: \n") + 3 * sizeof(size_t)];
-  const char *error = NULL;
   
-  if ((crtc          == NULL) ||
-      (coalesce      == NULL) ||
-      (high_priority == NULL) ||
-      (low_priority  == NULL))
-    return fprintf(stderr, "%s: ignoring incomplete Command: get-gamma message\n", argv0), 0;
+  if (crtc          == NULL)  return send_error("protocol error: 'CRTC' header omitted");
+  if (coalesce      == NULL)  return send_error("protocol error: 'Coalesce' header omitted");
+  if (high_priority == NULL)  return send_error("protocol error: 'High priority' header omitted");
+  if (low_priority  == NULL)  return send_error("protocol error: 'Low priority' header omitted");
   
   high = (int64_t)atoll(high_priority);
   low  = (int64_t)atoll(low_priority);
@@ -614,28 +676,13 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
   else if (!strcmp(coalesce, "no"))
     coal = 0;
   else
-    return fprintf(stderr, "%s: ignoring Command: get-gamma message with bad Coalesce value: %s\n",
-		   argv0, coalesce), 0;
+    return send_error("protocol error: recognised value for 'Coalesce' header");
   
   output = output_find_by_name(crtc, outputs, outputs_n);
   if (output == NULL)
-    error = "No such CRTC";
+    return send_error("selected CRTC does not exist");
   else if (output->supported == LIBGAMMA_NO)
-    error = "CRTC does not support gamma ramps";
-  
-  if (error != NULL)
-    {
-      MAKE_MESSAGE(&buf, &n, 0,
-		   "Command: error\n"
-		   "In response to: %s\n"
-		   "Error: custom\n"
-		   "Length: %zu\n"
-		   "\n"
-		   "%s\n",
-		   message_id, strlen(error) + 1, error);
-      
-      return send_message(conn, buf, n);
-    }
+    return send_error("selected CRTC does not support gamma adjustments");
   
   for (start = 0; start < output->table_size; start++)
     if (output->table_filters[start].priority <= high)
@@ -742,10 +789,9 @@ static int set_gamma(size_t conn, char* message_id, char* crtc, char* priority, 
   int saved_errno;
   ssize_t r;
   
-  if ((crtc     == NULL) ||
-      (class    == NULL) ||
-      (lifespan == NULL))
-    return fprintf(stderr, "%s: ignoring incomplete Command: set-gamma message\n", argv0), 0;
+  if (crtc     == NULL)  return send_error("protocol error: 'CRTC' header omitted");
+  if (class    == NULL)  return send_error("protocol error: 'Class' header omitted");
+  if (lifespan == NULL)  return send_error("protocol error: 'Lifespan' header omitted");
   
   filter.client   = connections[conn];
   filter.priority = priority == NULL ? 0 : (int64_t)atoll(priority);
@@ -753,17 +799,14 @@ static int set_gamma(size_t conn, char* message_id, char* crtc, char* priority, 
   
   output = output_find_by_name(crtc, outputs, outputs_n);
   if (output == NULL)
-    return fprintf(stderr, "%s: ignoring Command: set-gamma message with non-existing CRTC: %s\n",
-		   argv0, crtc), 0;
+    return send_error("CRTC does not exists");
   
   p = strstr(class, "::");
   if ((p == NULL) || (p == class))
-    return fprintf(stderr, "%s: ignoring Command: set-gamma message with malformatted class: %s\n",
-		   argv0, class), 0;
+    return send_error("protocol error: malformatted value for 'Class' header");
   q = strstr(p + 2, "::");
   if ((q == NULL) || (q == p))
-    return fprintf(stderr, "%s: ignoring Command: set-gamma message with malformatted class: %s\n",
-		   argv0, class), 0;
+    return send_error("protocol error: malformatted value for 'Class' header");
   
   if (!strcmp(lifespan, "until-removal"))
     filter.lifespan = LIFESPAN_UNTIL_REMOVAL;
@@ -772,8 +815,7 @@ static int set_gamma(size_t conn, char* message_id, char* crtc, char* priority, 
   else if (!strcmp(lifespan, "remove"))
     filter.lifespan = LIFESPAN_REMOVE;
   else
-    return fprintf(stderr, "%s: ignoring Command: set-gamma message with bad lifetime: %s\n",
-		   argv0, lifespan), 0;
+    return send_error("protocol error: recognised value for 'Lifespan' header");
   
   if (filter.lifespan == LIFESPAN_REMOVE)
     {
@@ -785,10 +827,9 @@ static int set_gamma(size_t conn, char* message_id, char* crtc, char* priority, 
 			"Lifespan: remove\n", argv0);
     }
   else if (msg->payload_size != output->ramps_size)
-    return fprintf(stderr, "%s: ignoring Command: set-gamma message bad payload: size: %zu instead of %zu\n",
-		   argv0, msg->payload_size, output->ramps_size), 0;
-  else if (priority == 0)
-    return fprintf(stderr, "%s: ignoring incomplete Command: set-gamma message\n", argv0), 0;
+    return send_error("invalid payload: size of message payload does matched the expectancy");
+  else if (priority == NULL)
+    return send_error("protocol error: 'Priority' header omitted");
   
   filter.class = memdup(class, strlen(class) + 1);
   if (filter.class == NULL)
@@ -808,10 +849,11 @@ static int set_gamma(size_t conn, char* message_id, char* crtc, char* priority, 
   if (flush_filters(output, (size_t)r))
     goto fail;
   
-  return 0;
+  return send_errno(0);
   
  fail:
   saved_errno = errno;
+  send_errno(saved_errno);
   free(filter.class);
   free(filter.ramps);
   errno = saved_errno;

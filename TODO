@@ -1,2 +1,0 @@
-A `Command: error` message should always be sent
-in response to a `Command: set-gamma` messge.
