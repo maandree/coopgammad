@@ -484,9 +484,6 @@ static int enumerate_crtcs(size_t conn, char* message_id)
   size_t i, n = 0, len;
   char* buf;
   
-  if (message_id == NULL)
-    return fprintf(stderr, "%s: ignoring incomplete Command: enumerate-crtcs message\n", argv0), 0;
-  
   for (i = 0; i < outputs_n; i++)
     n += strlen(outputs[i].name) + 1;
   
@@ -525,7 +522,7 @@ static int get_gamma_info(size_t conn, char* message_id, char* crtc)
   const char* supported;
   size_t n;
   
-  if ((message_id == NULL) || (crtc == NULL))
+  if (crtc == NULL)
     return fprintf(stderr, "%s: ignoring incomplete Command: get-gamma-info message\n", argv0), 0;
   
   output = output_find_by_name(crtc, outputs, outputs_n);
@@ -603,8 +600,7 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
   char tables[sizeof("Tables: \n") + 3 * sizeof(size_t)];
   const char *error = NULL;
   
-  if ((message_id    == NULL) ||
-      (crtc          == NULL) ||
+  if ((crtc          == NULL) ||
       (coalesce      == NULL) ||
       (high_priority == NULL) ||
       (low_priority  == NULL))
@@ -727,15 +723,16 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
 /**
  * Handle a ‘Command: set-gamma’ message
  * 
- * @param   conn      The index of the connection
- * @param   crtc      The value of the ‘CRTC’ header
- * @param   priority  The value of the ‘Priority’ header
- * @param   class     The value of the ‘Class’ header
- * @param   lifespan  The value of the ‘Lifespan’ header
- * @return            Zero on success (even if ignored), -1 on error,
- *                    1 if connection closed
+ * @param   conn        The index of the connection
+ * @param   message_id  The value of the ‘Message ID’ header
+ * @param   crtc        The value of the ‘CRTC’ header
+ * @param   priority    The value of the ‘Priority’ header
+ * @param   class       The value of the ‘Class’ header
+ * @param   lifespan    The value of the ‘Lifespan’ header
+ * @return              Zero on success (even if ignored), -1 on error,
+ *                      1 if connection closed
  */
-static int set_gamma(size_t conn, char* crtc, char* priority, char* class, char* lifespan)
+static int set_gamma(size_t conn, char* message_id, char* crtc, char* priority, char* class, char* lifespan)
 {
   struct message* msg = inbound + conn;
   struct output* output = NULL;
@@ -842,7 +839,7 @@ static int handle_connection(size_t conn)
   char* priority      = NULL;
   char* class         = NULL;
   char* lifespan      = NULL;
-  char* message_id    = NULL; /* Never report as superfluous */
+  char* message_id    = NULL;
   size_t i;
   
  again:
@@ -896,7 +893,9 @@ static int handle_connection(size_t conn)
   
   r = 0;
   if (command == NULL)
-    fprintf(stderr, "%s: ignoring message without command header\n", argv0);
+    fprintf(stderr, "%s: ignoring message without Command header\n", argv0);
+  else if (message_id == NULL)
+    fprintf(stderr, "%s: ignoring message without Message ID header\n", argv0);
   else if (!strcmp(command, "enumerate-crtcs"))
     {
       if (crtc || coalesce || high_priority || low_priority || priority || class || lifespan)
@@ -919,7 +918,7 @@ static int handle_connection(size_t conn)
     {
       if (coalesce || high_priority || low_priority)
 	fprintf(stderr, "%s: ignoring superfluous headers in Command: set-gamma message\n", argv0);
-      r = set_gamma(conn, crtc, priority, class, lifespan);
+      r = set_gamma(conn, message_id, crtc, priority, class, lifespan);
     }
   else
     fprintf(stderr, "%s: ignoring unrecognised command: Command: %s\n", argv0, command);
