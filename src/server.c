@@ -598,7 +598,7 @@ static int get_gamma_info(size_t conn, char* message_id, char* crtc)
   const char* supported;
   size_t n;
   
-  if (crtc  == NULL)  return send_error("protocol error: 'CRTC' header omitted");
+  if (crtc == NULL)  return send_error("protocol error: 'CRTC' header omitted");
   
   output = output_find_by_name(crtc, outputs, outputs_n);
   if (output == NULL)
