@@ -691,12 +691,8 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
   
   switch (output->depth)
     {
-    case -2:
-      sprintf(depth, "%s", "d");
-      break;
-    case -1:
-      sprintf(depth, "%s", "f");
-      break;
+    case -2:  strcpy(depth, "d");  break;
+    case -1:  strcpy(depth, "f");  break;
     default:
       sprintf(depth, "%i", output->depth);
       break;
