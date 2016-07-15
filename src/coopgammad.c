@@ -709,7 +709,7 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
 	goto fail;
       if (fchmod(socketfd, S_IRWXU) < 0)
 	goto fail;
-      if (bind(socketfd, (struct sockaddr*)(&address), sizeof(address)) < 0)
+      if (bind(socketfd, (struct sockaddr*)(&address), (socklen_t)sizeof(address)) < 0)
 	goto fail;
       if (listen(socketfd, SOMAXCONN) < 0)
 	goto fail;
