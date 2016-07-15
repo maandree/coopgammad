@@ -564,7 +564,7 @@ static int enumerate_crtcs(size_t conn, char* message_id)
     n += strlen(outputs[i].name) + 1;
   
   MAKE_MESSAGE(&buf, &n, 0,
-	       "Command: crtc-enumeration: %s\n"
+	       "Command: crtc-enumeration%s\n"
 	       "In response to: %s\n"
 	       "Length: %zu\n"
 	       "\n",
