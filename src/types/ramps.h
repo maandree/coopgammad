@@ -15,6 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef TYPES_RAMPS_H
+#define TYPES_RAMPS_H
+
+
 #include <libgamma.h>
 
 
@@ -93,19 +97,6 @@ size_t gamma_ramps_marshal(const union gamma_ramps* restrict this, void* restric
 GCC_ONLY(__attribute__((nonnull)))
 size_t gamma_ramps_unmarshal(union gamma_ramps* restrict this, const void* restrict buf, size_t ramps_size);
 
-/**
- * Apply a ramp-trio on top of another ramp-trio
- * 
- * @param  dest         The output for the resulting ramp-trio, must be initialised
- * @param  application  The red, green and blue ramps, as one single raw array,
- *                      of the filter that should be applied
- * @param  depth        -1: `float` stops
- *                      -2: `double` stops
- *                      Other: the number of bits of each (integral) stop
- * @param  base         The CLUT on top of which the new filter should be applied,
- *                      this can be the same pointer as `dest`
- */
-GCC_ONLY(__attribute__((nonnull)))
-void apply(union gamma_ramps* restrict dest, void* restrict application,
-	   int depth, union gamma_ramps* restrict base);
+
+#endif
 

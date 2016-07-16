@@ -15,7 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <libgamma.h>
+#include "arg.h"
+#include "util.h"
+#include "server.h"
+#include "state.h"
 
 #include <sys/resource.h>
 #include <sys/socket.h>
@@ -29,11 +32,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "arg.h"
-#include "output.h"
-#include "util.h"
-#include "server.h"
 
 
 
@@ -55,49 +53,11 @@
 
 
 
-extern char* restrict argv0_real;
-extern struct output* restrict outputs;
-extern size_t outputs_n;
-extern int socketfd;
 extern char* restrict pidpath;
 extern char* restrict socketpath;
 extern int gerror;
-extern int method;
-extern char* restrict sitename;
-extern libgamma_site_state_t site;
-extern libgamma_partition_state_t* restrict partitions;
-extern libgamma_crtc_state_t* restrict crtcs;
-extern volatile sig_atomic_t reexec;
-extern volatile sig_atomic_t terminate;
-extern volatile sig_atomic_t connection;
 
 
-
-/**
- * The name of the process
- */
-char* restrict argv0;
-
-/**
- * The real pathname of the process's binary,
- * `NULL` if `argv0` is satisfactory
- */
-char* restrict argv0_real = NULL;
-
-/**
- * Array of all outputs
- */
-struct output* restrict outputs = NULL;
-
-/**
- * The nubmer of elements in `outputs`
- */
-size_t outputs_n = 0;
-
-/**
- * The server socket's file descriptor
- */
-int socketfd = -1;
 
 /**
  * The pathname of the PID file
@@ -112,52 +72,7 @@ char* restrict socketpath = NULL;
 /**
  * Error code returned by libgamma
  */
-int gerror;
-
-/**
- * The adjustment method, -1 for automatic
- */
-int method = -1;
-
-/**
- * The site's name, may be `NULL`
- */
-char* restrict sitename = NULL;
-
-/**
- * The libgamma site state
- */
-libgamma_site_state_t site;
-
-/**
- * The libgamma partition states
- */
-libgamma_partition_state_t* restrict partitions = NULL;
-
-/**
- * The libgamma CRTC states
- */
-libgamma_crtc_state_t* restrict crtcs = NULL;
-
-/**
- * Has the process receive a signal
- * telling it to re-execute?
- */
-volatile sig_atomic_t reexec = 0;
-
-/**
- * Has the process receive a signal
- * telling it to terminate?
- */
-volatile sig_atomic_t terminate = 0;
-
-/**
- * Has the process receive a to
- * disconnect from or reconnect to
- * the site? 1 if disconnct, 2 if
- * reconnect, 0 otherwise.
- */
-volatile sig_atomic_t connection = 0;
+int gerror; /* do not marshal */
 
 
 
@@ -905,12 +820,16 @@ static void destroy(int full)
 {
   size_t i;
   
+  if (full)
+    disconnect_all();
+  
   if (full && (socketfd >= 0))
     {
       shutdown(socketfd, SHUT_RDWR);
       close(socketfd);
       unlink(socketpath);
     }
+  
 #define RESTORE_RAMPS(SUFFIX, MEMBER) \
   do \
     if (outputs[i].saved_ramps.MEMBER.red != NULL) \
@@ -922,51 +841,36 @@ static void destroy(int full)
   while (0)
   if (outputs != NULL)
     for (i = 0; i < outputs_n; i++)
-      {
-	if (full && (outputs[i].supported != LIBGAMMA_NO))
-	  switch (outputs[i].depth)
-	    {
-	    case 8:
-	      RESTORE_RAMPS(8, u8);
-	      break;
-	    case 16:
-	      RESTORE_RAMPS(16, u16);
-	      break;
-	    case 32:
-	      RESTORE_RAMPS(32, u32);
-	      break;
-	    case 64:
-	      RESTORE_RAMPS(64, u64);
-		break;
-	    case -1:
-	      RESTORE_RAMPS(f, f);
-	      break;
-	    case -2:
-	      RESTORE_RAMPS(d, d);
-	      break;
-	    default:
-	      break; /* impossible */
-	    }
-	if (crtcs == NULL)
-	  libgamma_crtc_destroy(outputs[i].crtc + i);
-	output_destroy(outputs + i);
-      }
-  free(outputs);
-  if (crtcs != NULL)
-    for (i = 0; i < outputs_n; i++)
-      libgamma_crtc_destroy(crtcs + i);
-  free(crtcs);
-  if (partitions != NULL)
-    for (i = 0; i < site.partitions_available; i++)
-      libgamma_partition_destroy(partitions + i);
-  free(partitions);
-  libgamma_site_destroy(&site);
+      if (full && (outputs[i].supported != LIBGAMMA_NO))
+	switch (outputs[i].depth)
+	  {
+	  case 8:
+	    RESTORE_RAMPS(8, u8);
+	    break;
+	  case 16:
+	    RESTORE_RAMPS(16, u16);
+	    break;
+	  case 32:
+	    RESTORE_RAMPS(32, u32);
+	    break;
+	  case 64:
+	    RESTORE_RAMPS(64, u64);
+	    break;
+	  case -1:
+	    RESTORE_RAMPS(f, f);
+	    break;
+	  case -2:
+	    RESTORE_RAMPS(d, d);
+	    break;
+	  default:
+	    break; /* impossible */
+	  }
+  
   free(socketpath);
   if (full && (pidpath != NULL))
     unlink(pidpath);
   free(pidpath);
-  free(argv0_real);
-  free(sitename);
+  state_destroy();
 }
 
 
@@ -987,36 +891,11 @@ static void destroy(int full)
  */
 static size_t marshal(void* restrict buf)
 {
-  size_t off = 0, i, n;
+  size_t off = 0, n;
   char* restrict bs = buf;
   
   if (bs != NULL)
     *(int*)(bs + off) = MARSHAL_VERSION;
-  off += sizeof(int);
-  
-  if (argv0_real == NULL)
-    {
-      if (bs != NULL)
-	*(bs + off) = '\0';
-      off += 1;
-    }
-  else
-    {
-      n = strlen(argv0_real) + 1;
-      if (bs != NULL)
-	memcpy(bs + off, argv0_real, n);
-      off += n;
-    }
-  
-  if (bs != NULL)
-    *(size_t*)(bs + off) = outputs_n;
-  off += sizeof(size_t);
-  
-  for (i = 0; i < outputs_n; i++)
-    off += output_marshal(outputs + i, bs ? bs + off : NULL);
-  
-  if (bs != NULL)
-    *(int*)(bs + off) = socketfd;
   off += sizeof(int);
   
   n = strlen(pidpath) + 1;
@@ -1029,26 +908,7 @@ static size_t marshal(void* restrict buf)
     memcpy(bs + off, socketpath, n);
   off += n;
   
-  off += server_marshal(bs ? bs + off : NULL);
-  
-  if (bs != NULL)
-    *(int*)(bs + off) = method;
-  off += sizeof(int);
-  
-  if (bs != NULL)
-    *(int*)(bs + off) = sitename != NULL;
-  off += sizeof(int);
-  if (sitename != NULL)
-    {
-      n = strlen(sitename) + 1;
-      if (bs != NULL)
-	memcpy(bs + off, sitename, n);
-      off += n;
-    }
-  
-  if (bs != NULL)
-    *(sig_atomic_t*)(bs + off) = connection;
-  off += sizeof(sig_atomic_t);
+  off += state_marshal(bs ? bs + off : NULL);
   
   return off;
 }
@@ -1061,41 +921,17 @@ static size_t marshal(void* restrict buf)
  * @return       The number of marshalled bytes, 0 on error
  */
 GCC_ONLY(__attribute__((nonnull)))
-static size_t unmarshal(void* restrict buf)
+static size_t unmarshal(const void* restrict buf)
 {
-  size_t off = 0, i, n;
-  char* restrict bs = buf;
+  size_t off = 0, n;
+  const char* restrict bs = buf;
   
-  if (*(int*)(bs + off) != MARSHAL_VERSION)
+  if (*(const int*)(bs + off) != MARSHAL_VERSION)
     {
       fprintf(stderr, "%s: re-executing to incompatible version, sorry about that\n", argv0);
       errno = 0;
       return 0;
     }
-  off += sizeof(int);
-  
-  if (*(bs + off))
-    {
-      off += 1;
-      n = strlen(bs + off) + 1;
-      if (!(argv0_real = memdup(bs + off, n)))
-	return 0;
-      off += n;
-    }
-  else
-    off += 1;
-  
-  outputs_n = *(size_t*)(bs + off);
-  off += sizeof(size_t);
-  
-  for (i = 0; i < outputs_n; i++)
-    {
-      off += n = output_unmarshal(outputs + i, bs + off);
-      if (n == 0)
-	return 0;
-    }
-  
-  socketfd = *(int*)(bs + off);
   off += sizeof(int);
   
   n = strlen(bs + off) + 1;
@@ -1108,26 +944,9 @@ static size_t unmarshal(void* restrict buf)
     return 0;
   off += n;
   
-  off += n = server_unmarshal(bs + off);
+  off += n = state_unmarshal(bs + off);
   if (n == 0)
     return 0;
-  
-  method = *(int*)(bs + off);
-  off += sizeof(int);
-  
-  if (*(int*)(bs + off))
-    {
-      off += sizeof(int);
-      n = strlen(bs + off) + 1;
-      if (!(sitename = memdup(bs + off, n)))
-	return 0;
-      off += n;
-    }
-  else
-    off += sizeof(int);
-  
-  connection = *(sig_atomic_t*)(bs + off);
-  off += sizeof(sig_atomic_t);
   
   return off;
 }

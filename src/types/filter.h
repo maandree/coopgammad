@@ -15,6 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef TYPES_FILTER_H
+#define TYPES_FILTER_H
+
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -128,4 +132,7 @@ size_t filter_marshal(const struct filter* restrict this, void* restrict buf, si
  */
 GCC_ONLY(__attribute__((nonnull)))
 size_t filter_unmarshal(struct filter* restrict this, const void* restrict buf, size_t ramps_size);
+
+
+#endif
 

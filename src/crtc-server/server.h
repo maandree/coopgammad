@@ -15,21 +15,34 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef SERVER_H
-#define SERVER_H
+#ifndef CRTC_SERVER_SERVER_H
+#define CRTC_SERVER_SERVER_H
+
+
+#include <stddef.h>
+
+
+
+#ifndef GCC_ONLY
+# if defined(__GNUC__) && !defined(__clang__)
+#  define GCC_ONLY(...)  __VA_ARGS__
+# else
+#  define GCC_ONLY(...)  /* nothing */
+# endif
+#endif
+
 
 
 /**
- * Disconnect all clients
- */
-void disconnect_all(void);
-
-/**
- * The program's main loop
+ * Handle a ‘Command: enumerate-crtcs’ message
  * 
- * @return  Zero on success, -1 on error
+ * @param   conn        The index of the connection
+ * @param   message_id  The value of the ‘Message ID’ header
+ * @return              Zero on success (even if ignored), -1 on error,
+ *                      1 if connection closed
  */
-int main_loop(void);
+GCC_ONLY(__attribute__((nonnull)))
+int handle_enumerate_crtcs(size_t conn, const char* restrict message_id);
 
 
 #endif

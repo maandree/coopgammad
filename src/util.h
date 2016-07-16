@@ -15,6 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef UTIL_H
+#define UTIL_H
+
+
 #include <stddef.h>
 
 
@@ -96,4 +100,7 @@ void msleep(int ms);
  */
 GCC_ONLY(__attribute__((pure, nonnull)))
 int verify_utf8(const char* restrict string, int allow_modified_nul);
+
+
+#endif
 

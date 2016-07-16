@@ -15,6 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef TYPES_RING_H
+#define TYPES_RING_H
+
+
 #include <stddef.h>
 
 
@@ -142,4 +146,7 @@ static inline int ring_have_more(struct ring* restrict this)
 {
   return this->buffer != NULL;
 }
+
+
+#endif
 

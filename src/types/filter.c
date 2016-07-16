@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "filter.h"
-#include "util.h"
+#include "../util.h"
 
 #include <stdlib.h>
 #include <string.h>

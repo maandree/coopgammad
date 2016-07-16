@@ -3,7 +3,21 @@ COMMAND = coopgammad
 
 KERNEL = $(shell uname | tr '[A-Z]_' '[a-z]-')
 
-SRC = filter coopgammad output ramps util message server ring
+SRC = \
+	coopgammad			\
+	server				\
+	util				\
+	communication			\
+	state				\
+	crtc-server/server		\
+	gamma-server/server		\
+	coopgamma-server/server		\
+	coopgamma-server/chaining	\
+	types/filter			\
+	types/output			\
+	types/ramps			\
+	types/message			\
+	types/ring
 
 OPTIMISE = -Og -g
 
@@ -34,7 +48,7 @@ bin/coopgammad: $(foreach S,$(SRC),obj/$(S).o)
 	@mkdir -p -- "$$(dirname -- "$@")"
 	$(CC) $(LDFLAGS) -o $@ $^
 
-obj/%.o: src/%.c src/*.h
+obj/%.o: src/%.c src/*.h src/*/*.h
 	@mkdir -p -- "$$(dirname -- "$@")"
 	$(CC) $(CCFLAGS) $(CPPFLAGS) -c -o $@ $<
 

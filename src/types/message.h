@@ -15,6 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef TYPES_MESSAGE_H
+#define TYPES_MESSAGE_H
+
+
 #include <stddef.h>
 #include <limits.h>
 
@@ -150,4 +154,7 @@ size_t message_unmarshal(struct message* restrict this, const void* restrict buf
  */
 GCC_ONLY(__attribute__((nonnull)))
 int message_read(struct message* restrict this, int fd);
+
+
+#endif
 

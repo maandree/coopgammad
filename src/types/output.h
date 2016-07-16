@@ -15,6 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef TYPES_OUTPUT_H
+#define TYPES_OUTPUT_H
+
+
 #include <stddef.h>
 
 #include <libgamma.h>
@@ -197,34 +201,6 @@ int output_cmp_by_name(const void* restrict a, const void* restrict b);
 GCC_ONLY(__attribute__((pure, nonnull)))
 struct output* output_find_by_name(const char* restrict key, struct output* restrict base, size_t n);
 
-/**
- * Add a filter to an output
- * 
- * @param   output  The output
- * @param   filter  The filter
- * @return          The index given to the filter, -1 on error
- */
-GCC_ONLY(__attribute__((nonnull)))
-ssize_t add_filter(struct output* restrict output, struct filter* restrict filter);
 
-/**
- * Recalculate the resulting gamma and
- * update push the new gamma ramps to the CRTC
- * 
- * @param   output         The output
- * @param   first_updated  The index of the first added or removed filter
- * @return                 Zero on success, -1 on error
- */
-GCC_ONLY(__attribute__((nonnull)))
-int flush_filters(struct output* restrict output, size_t first_updated);
-
-/**
- * Make identity mapping ramps
- * 
- * @param   ramps   Output parameter for the ramps
- * @param   output  The output for which the ramps shall be configured
- * @return          Zero on success, -1 on error
- */
-GCC_ONLY(__attribute__((nonnull)))
-int make_plain_ramps(union gamma_ramps* restrict ramps, struct output* restrict output);
+#endif
 
