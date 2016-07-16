@@ -45,7 +45,6 @@
 
 
 
-extern char* argv0;
 extern char* argv0_real;
 extern struct output* outputs;
 extern size_t outputs_n;
@@ -60,6 +59,7 @@ extern libgamma_partition_state_t* partitions;
 extern libgamma_crtc_state_t* crtcs;
 extern volatile sig_atomic_t reexec;
 extern volatile sig_atomic_t terminate;
+extern volatile sig_atomic_t connection;
 
 
 
@@ -141,13 +141,21 @@ volatile sig_atomic_t reexec = 0;
  */
 volatile sig_atomic_t terminate = 0;
 
+/**
+ * Has the process receive a to
+ * disconnect from or reconnect to
+ * the site? 1 if disconnct, 2 if
+ * reconnect, 0 otherwise.
+ */
+volatile sig_atomic_t connection = 0;
+
 
 
 /**
  * Called when the process receives
  * a signal telling it to re-execute
  * 
- * @param  signo The received signal
+ * @param  signo  The received signal
  */
 static void sig_reexec(int signo)
 {
@@ -160,12 +168,25 @@ static void sig_reexec(int signo)
  * Called when the process receives
  * a signal telling it to terminate
  * 
- * @param  signo The received signal
+ * @param  signo  The received signal
  */
 static void sig_terminate(int signo)
 {
   terminate = 1;
   (void) signo;
+}
+
+
+/**
+ * Called when the process receives
+ * a signal telling it to disconnect
+ * from or reconnect to the site
+ * 
+ * @param  signo  The received signal
+ */
+static void sig_connection(int signo)
+{
+  connection = signo - SIGRTMIN + 1;
 }
 
 
@@ -748,6 +769,10 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
     goto fail;
   if (signal(SIGTERM, sig_terminate) == SIG_ERR)
     goto fail;
+  if (signal(SIGRTMIN + 0, sig_connection) == SIG_ERR)
+    goto fail;
+  if (signal(SIGRTMIN + 1, sig_connection) == SIG_ERR)
+    goto fail;
   
   /* Place in the background unless -f */
   if (full && (foreground == 0))
@@ -1002,6 +1027,10 @@ static size_t marshal(void* buf)
       off += n;
     }
   
+  if (bs != NULL)
+    *(sig_atomic_t*)(bs + off) = connection;
+  off += sizeof(sig_atomic_t);
+  
   return off;
 }
 
@@ -1076,6 +1105,9 @@ static size_t unmarshal(void* buf)
     }
   else
     off += sizeof(int);
+  
+  connection = *(sig_atomic_t*)(bs + off);
+  off += sizeof(sig_atomic_t);
   
   return off;
 }
@@ -1285,8 +1317,10 @@ static void usage(void)
  * 
  * The process closes stdout when the socket has been created
  * 
- * @signal  SIGUSR1  Re-execute to updated process image
- * @signal  SIGTERM  Terminate the process gracefully
+ * @signal  SIGUSR1     Re-execute to updated process image
+ * @signal  SIGTERM     Terminate the process gracefully
+ * @signal  SIGRTMIN+0  Disconnect from the site
+ * @signal  SiGRTMIN+1  Reconnect to the site
  * 
  * @param   argc  The number of elements in `argv`
  * @param   argv  Command line arguments. Recognised options:

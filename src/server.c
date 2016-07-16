@@ -94,6 +94,14 @@ extern volatile sig_atomic_t reexec;
 extern volatile sig_atomic_t terminate;
 
 /**
+ * Has the process receive a to
+ * disconnect from or reconnect to
+ * the site? 1 if disconnct, 2 if
+ * reconnect, 0 otherwise.
+ */
+extern volatile sig_atomic_t connection;
+
+/**
  * Array of all outputs
  */
 extern struct output* outputs;
@@ -1003,6 +1011,17 @@ int main_loop(void)
   
   while (!reexec && !terminate)
     {
+      if (connection == 1) /* disconnect */
+	{
+	  connection = 0;
+	  /* TODO */
+	}
+      else if (connection >= 2) /* reconnect */
+	{
+	  connection = 0;
+	  /* TODO */
+	}
+      
       memcpy(&fds_rd, &fds_orig, sizeof(fd_set));
       memcpy(&fds_ex, &fds_orig, sizeof(fd_set));
       

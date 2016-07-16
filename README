@@ -78,6 +78,14 @@ SIGNALS
 	SIGUSR1
 		Reexecute the process to an updated version.
 
+	SIGRTMIN+0
+		Disconnect from the display server or
+		graphics card.
+
+	SIGRTMIN+1
+		Reconnect to the display server or graphics
+		card.
+
 RATIONALE
 	After reading the description section, the need for
 	this should be obvious.
