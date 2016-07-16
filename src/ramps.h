@@ -19,6 +19,16 @@
 
 
 
+#ifndef GCC_ONLY
+# if defined(__GNUC__) && !defined(__clang__)
+#  define GCC_ONLY(...)  __VA_ARGS__
+# else
+#  define GCC_ONLY(...)  /* nothing */
+# endif
+#endif
+
+
+
 /**
  * Gamma ramps union for all
  * lbigamma gamma ramps types
@@ -69,7 +79,8 @@ union gamma_ramps
  * @param   ramps_size  The byte-size of ramps
  * @return              The number of marshalled byte
  */
-size_t gamma_ramps_marshal(const union gamma_ramps* this, void* buf, size_t ramps_size);
+GCC_ONLY(__attribute__((nonnull(1))))
+size_t gamma_ramps_marshal(const union gamma_ramps* restrict this, void* restrict buf, size_t ramps_size);
 
 /**
  * Unmarshal a ramp trio
@@ -79,7 +90,8 @@ size_t gamma_ramps_marshal(const union gamma_ramps* this, void* buf, size_t ramp
  * @param   ramps_size  The byte-size of ramps
  * @return              The number of unmarshalled bytes, 0 on error
  */
-size_t gamma_ramps_unmarshal(union gamma_ramps* this, const void* buf, size_t ramps_size);
+GCC_ONLY(__attribute__((nonnull)))
+size_t gamma_ramps_unmarshal(union gamma_ramps* restrict this, const void* restrict buf, size_t ramps_size);
 
 /**
  * Apply a ramp-trio on top of another ramp-trio
@@ -93,5 +105,7 @@ size_t gamma_ramps_unmarshal(union gamma_ramps* this, const void* buf, size_t ra
  * @param  base         The CLUT on top of which the new filter should be applied,
  *                      this can be the same pointer as `dest`
  */
-void apply(union gamma_ramps* dest, void* application, int depth, union gamma_ramps* base);
+GCC_ONLY(__attribute__((nonnull)))
+void apply(union gamma_ramps* restrict dest, void* restrict application,
+	   int depth, union gamma_ramps* restrict base);
 

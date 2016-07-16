@@ -34,7 +34,7 @@
  * @return       The duplicate of the memory segment,
  *               `NULL` on error
  */
-void* memdup(const void* src, size_t n)
+void* memdup(const void* restrict src, size_t n)
 {
   void* dest = malloc(n);
   if (dest == NULL)
@@ -52,7 +52,7 @@ void* memdup(const void* src, size_t n)
  * @return      The read content, plus a NUL byte at
  *              the end (not counted in `*n`)
  */
-void* nread(int fd, size_t* n)
+void* nread(int fd, size_t* restrict n)
 {
   size_t size = 32;
   ssize_t got;
@@ -113,9 +113,9 @@ void* nread(int fd, size_t* n)
  * @return       The number of written bytes, less than `n`
  *               on error, cannot exceed `n`
  */
-size_t nwrite(int fd, const void* buf, size_t n)
+size_t nwrite(int fd, const void* restrict buf, size_t n)
 {
-  const char* bs = buf;
+  const char* restrict bs = buf;
   ssize_t wrote;
   size_t ptr = 0;
   
@@ -189,6 +189,7 @@ void msleep(int ms)
     nanosleep(&ts, NULL);
 }
 
+
 /**
  * Check whether a NUL-terminated string is encoded in UTF-8
  * 
@@ -196,7 +197,7 @@ void msleep(int ms)
  * @param   allow_modified_nul  Whether Modified UTF-8 is allowed, which allows a two-byte encoding for NUL
  * @return                      Zero if good, -1 on encoding error
  */
-int verify_utf8(const char* string, int allow_modified_nul)
+int verify_utf8(const char* restrict string, int allow_modified_nul)
 {
   static long BYTES_TO_MIN_BITS[] = {0, 0,  8, 12, 17, 22, 37};
   static long BYTES_TO_MAX_BITS[] = {0, 7, 11, 16, 21, 26, 31};

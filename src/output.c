@@ -29,7 +29,7 @@
 /**
  * The name of the process
  */
-extern char* argv0;
+extern char* restrict argv0;
 
 
 
@@ -40,7 +40,7 @@ extern char* argv0;
  * 
  * @param  this  The output
  */
-void output_destroy(struct output* this)
+void output_destroy(struct output* restrict this)
 {
   size_t i;
   
@@ -106,7 +106,7 @@ void output_destroy(struct output* this)
  *                needs to be
  * @return        The number of marshalled byte
  */
-size_t output_marshal(const struct output* this, void* buf)
+size_t output_marshal(const struct output* restrict this, void* restrict buf)
 {
   size_t off = 0, i, n;
   char* bs = buf;
@@ -163,7 +163,7 @@ size_t output_marshal(const struct output* this, void* buf)
  * @param   buf   Buffer with the marshalled output
  * @return        The number of unmarshalled bytes, 0 on error
  */
-size_t output_unmarshal(struct output* this, const void* buf)
+size_t output_unmarshal(struct output* restrict this, const void* restrict buf)
 {
   size_t off = 0, i, n;
   const char* bs = buf;
@@ -240,7 +240,7 @@ size_t output_unmarshal(struct output* this, const void* buf)
  * @return     See description of `a` and `b`,
  *             0 if returned if they are the same
  */
-int output_cmp_by_name(const void* a, const void* b)
+int output_cmp_by_name(const void* restrict a, const void* restrict b)
 {
   const char* an = ((const struct output*)a)->name;
   const char* bn = ((const struct output*)b)->name;
@@ -256,7 +256,7 @@ int output_cmp_by_name(const void* a, const void* b)
  * @param   n     The number of elements in `base`
  * @return        Output find in `base`, `NULL` if not found
  */
-struct output* output_find_by_name(const char* key, struct output* base, size_t n)
+struct output* output_find_by_name(const char* restrict key, struct output* restrict base, size_t n)
 {
   struct output k;
 
@@ -280,7 +280,7 @@ struct output* output_find_by_name(const char* key, struct output* base, size_t 
  * @param   filter  The filter
  * @return          The index of the filter, `out->table_size` if not found
  */
-static ssize_t remove_filter(struct output* out, struct filter* filter)
+static ssize_t remove_filter(struct output* restrict out, struct filter* restrict filter)
 {
   size_t i, n = out->table_size;
   
@@ -314,7 +314,7 @@ static ssize_t remove_filter(struct output* out, struct filter* filter)
  * @param   filter  The filter
  * @return          The index given to the filter, -1 on error
  */
-ssize_t add_filter(struct output* out, struct filter* filter)
+ssize_t add_filter(struct output* restrict out, struct filter* restrict filter)
 {
   size_t i, n = out->table_size;
   int r = -1;
@@ -389,7 +389,7 @@ ssize_t add_filter(struct output* out, struct filter* filter)
  * @param   first_updated  The index of the first added or removed filter
  * @return                 Zero on success, -1 on error
  */
-int flush_filters(struct output* output, size_t first_updated)
+int flush_filters(struct output* restrict output, size_t first_updated)
 {
   union gamma_ramps plain;
   union gamma_ramps* last;
@@ -439,7 +439,7 @@ int flush_filters(struct output* output, size_t first_updated)
  * @param   output  The output for which the ramps shall be configured
  * @return          Zero on success, -1 on error
  */
-int make_plain_ramps(union gamma_ramps* ramps, struct output* output)
+int make_plain_ramps(union gamma_ramps* restrict ramps, struct output* restrict output)
 {
   COPY_RAMP_SIZES(&(ramps->u8), output);
   switch (output->depth)

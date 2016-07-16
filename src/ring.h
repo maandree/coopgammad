@@ -19,6 +19,16 @@
 
 
 
+#ifndef GCC_ONLY
+# if defined(__GNUC__) && !defined(__clang__)
+#  define GCC_ONLY(...)  __VA_ARGS__
+# else
+#  define GCC_ONLY(...)  /* nothing */
+# endif
+#endif
+
+
+
 /**
  * Ring buffer
  */
@@ -27,7 +37,7 @@ struct ring
   /**
    * Buffer for the data
    */
-  char* buffer;
+  char* restrict buffer;
   
   /**
    * The first set byte in `.buffer`
@@ -52,14 +62,16 @@ struct ring
  * 
  * @param  this  The ring buffer
  */
-void ring_initialise(struct ring* this);
+GCC_ONLY(__attribute__((nonnull)))
+void ring_initialise(struct ring* restrict this);
 
 /**
  * Release resource allocated to a ring buffer
  * 
  * @param  this  The ring buffer
  */
-void ring_destroy(struct ring* this);
+GCC_ONLY(__attribute__((nonnull)))
+void ring_destroy(struct ring* restrict this);
 
 /**
  * Marshal a ring buffer
@@ -70,7 +82,8 @@ void ring_destroy(struct ring* this);
  *                is needed
  * @return        The number of marshalled bytes
  */
-size_t ring_marshal(const struct ring* this, void* buf);
+GCC_ONLY(__attribute__((nonnull(1))))
+size_t ring_marshal(const struct ring* restrict this, void* restrict buf);
 
 /**
  * Unmarshal a ring buffer
@@ -79,7 +92,8 @@ size_t ring_marshal(const struct ring* this, void* buf);
  * @param   buf   Buffer with the marshalled data
  * @return        The number of unmarshalled bytes, 0 on error
  */
-size_t ring_unmarshal(struct ring* this, const void* buf);
+GCC_ONLY(__attribute__((nonnull)))
+size_t ring_unmarshal(struct ring* restrict this, const void* restrict buf);
 
 /**
  * Append data to a ring buffer
@@ -89,7 +103,8 @@ size_t ring_unmarshal(struct ring* this, const void* buf);
  * @param   n     The number of bytes in `data`
  * @return        Zero on success, -1 on error
  */
-int ring_push(struct ring* this, void* data, size_t n);
+GCC_ONLY(__attribute__((nonnull(1))))
+int ring_push(struct ring* restrict this, void* restrict data, size_t n);
 
 /**
  * Get queued data from a ring buffer
@@ -103,7 +118,8 @@ int ring_push(struct ring* this, void* data, size_t n);
  * @return        The beginning of the queued data,
  *                `NULL` if there is nothing more
  */
-void* ring_peek(struct ring* this, size_t* n);
+GCC_ONLY(__attribute__((nonnull)))
+void* ring_peek(struct ring* restrict this, size_t* restrict n);
 
 /**
  * Dequeue data from a ring bubber
@@ -111,7 +127,8 @@ void* ring_peek(struct ring* this, size_t* n);
  * @param  this  The ring buffer
  * @param  n     The number of bytes to dequeue
  */
-void ring_pop(struct ring* this, size_t n);
+GCC_ONLY(__attribute__((nonnull)))
+void ring_pop(struct ring* restrict this, size_t n);
 
 /**
  * Check whether there is more data waiting
@@ -120,7 +137,8 @@ void ring_pop(struct ring* this, size_t n);
  * @param   this  The ring buffer
  * @return        1 if there is more data, 0 otherwise
  */
-static inline int ring_have_more(struct ring* this)
+GCC_ONLY(__attribute__((nonnull)))
+static inline int ring_have_more(struct ring* restrict this)
 {
   return this->buffer != NULL;
 }

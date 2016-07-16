@@ -19,6 +19,16 @@
 
 
 
+#ifndef GCC_ONLY
+# if defined(__GNUC__) && !defined(__clang__)
+#  define GCC_ONLY(...)  __VA_ARGS__
+# else
+#  define GCC_ONLY(...)  /* nothing */
+# endif
+#endif
+
+
+
 /**
  * Duplicate a memory segment
  * 
@@ -27,8 +37,8 @@
  * @return       The duplicate of the memory segment,
  *               `NULL` on error
  */
-void* memdup(const void* src, size_t n);
-
+GCC_ONLY(__attribute__((malloc, nonnull)))
+void* memdup(const void* restrict src, size_t n);
 
 /**
  * Read an entire file
@@ -40,8 +50,8 @@ void* memdup(const void* src, size_t n);
  * @return      The read content, plus a NUL byte at
  *              the end (not counted in `*n`)
  */
-void* nread(int fd, size_t* n);
-
+GCC_ONLY(__attribute__((malloc)))
+void* nread(int fd, size_t* restrict n);
 
 /**
  * Write an entire buffer to a file
@@ -54,8 +64,7 @@ void* nread(int fd, size_t* n);
  * @return       The number of written bytes, less than `n`
  *               on error, cannot exceed `n`
  */
-size_t nwrite(int fd, const void* buf, size_t n);
-
+size_t nwrite(int fd, const void* restrict buf, size_t n);
 
 /**
  * Duplicate a file descriptor an make sure
@@ -68,7 +77,6 @@ size_t nwrite(int fd, const void* buf, size_t n);
  */
 int dup2atleast(int fd, int atleast);
 
-
 /**
  * Perform a timed suspention of the process.
  * The process resumes when the timer expires,
@@ -79,7 +87,6 @@ int dup2atleast(int fd, int atleast);
  */
 void msleep(int ms);
 
-
 /**
  * Check whether a NUL-terminated string is encoded in UTF-8
  * 
@@ -87,8 +94,6 @@ void msleep(int ms);
  * @param   allow_modified_nul  Whether Modified UTF-8 is allowed, which allows a two-byte encoding for NUL
  * @return                      Zero if good, -1 on encoding error
  */
-#if defined(__GNUC__)
-__attribute__((pure))
-#endif
-int verify_utf8(const char* string, int allow_modified_nul);
+GCC_ONLY(__attribute__((pure, nonnull)))
+int verify_utf8(const char* restrict string, int allow_modified_nul);
 

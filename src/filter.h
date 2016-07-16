@@ -20,6 +20,16 @@
 
 
 
+#ifndef GCC_ONLY
+# if defined(__GNUC__) && !defined(__clang__)
+#  define GCC_ONLY(...)  __VA_ARGS__
+# else
+#  define GCC_ONLY(...)  /* nothing */
+# endif
+#endif
+
+
+
 /**
  * The lifespan of a filter
  */
@@ -91,7 +101,8 @@ struct filter
  * 
  * @param  this  The filter
  */
-void filter_destroy(struct filter* this);
+GCC_ONLY(__attribute__((nonnull)))
+void filter_destroy(struct filter* restrict this);
 
 /**
  * Marshal a filter
@@ -103,7 +114,8 @@ void filter_destroy(struct filter* this);
  * @param   ramps_size  The byte-size of `filter->ramps`
  * @return              The number of marshalled byte
  */
-size_t filter_marshal(const struct filter* this, void* buf, size_t ramps_size);
+GCC_ONLY(__attribute__((nonnull(1))))
+size_t filter_marshal(const struct filter* restrict this, void* restrict buf, size_t ramps_size);
 
 /**
  * Unmarshal a filter
@@ -114,5 +126,6 @@ size_t filter_marshal(const struct filter* this, void* buf, size_t ramps_size);
  * @param   ramps_size  The byte-size of `filter->ramps`
  * @return              The number of unmarshalled bytes, 0 on error
  */
-size_t filter_unmarshal(struct filter* this, const void* buf, size_t ramps_size);
+GCC_ONLY(__attribute__((nonnull)))
+size_t filter_unmarshal(struct filter* restrict this, const void* restrict buf, size_t ramps_size);
 

@@ -43,7 +43,7 @@
  * Unused slots, with index less than `connections_used`,
  * should have the value -1 (negative)
  */
-int* connections = NULL;
+int* restrict connections = NULL;
 
 /**
  * The number of elements allocated for `connections`
@@ -63,18 +63,18 @@ size_t connections_used = 0;
 /**
  * The clients' connections' inbound-message buffers
  */
-struct message* inbound = NULL;
+struct message* restrict inbound = NULL;
 
 /**
  * The clients' connections' outbound-message buffers
  */
-struct ring* outbound = NULL;
+struct ring* restrict outbound = NULL;
 
 
 /**
  * The name of the process
  */
-extern char* argv0;
+extern char* restrict argv0;
 
 /**
  * The server socket's file descriptor
@@ -104,7 +104,7 @@ extern volatile sig_atomic_t connection;
 /**
  * Array of all outputs
  */
-extern struct output* outputs;
+extern struct output* restrict outputs;
 
 /**
  * The nubmer of elements in `outputs`
@@ -177,10 +177,10 @@ void server_destroy(int disconnect)
  *               this buffer needs
  * @return       The number of marshalled bytes
  */
-size_t server_marshal(void* buf)
+size_t server_marshal(void* restrict buf)
 {
   size_t i, off = 0;
-  char* bs = buf;
+  char* restrict bs = buf;
   
   if (bs != NULL)
     *(size_t*)(bs + off) = connections_ptr;
@@ -211,10 +211,10 @@ size_t server_marshal(void* buf)
  * @param   buf  Buffer for the marshalled data
  * @return       The number of unmarshalled bytes, 0 on error
  */
-size_t server_unmarshal(const void* buf)
+size_t server_unmarshal(const void* restrict buf)
 {
   size_t off = 0, i, n;
-  const char* bs = buf;
+  const char* restrict bs = buf;
   
   connections = NULL;
   inbound = NULL;
@@ -265,7 +265,8 @@ size_t server_unmarshal(const void* buf)
  * @param   fds  The file descritor set
  * @return       The highest set file descritor plus 1
  */
-static int update_fdset(fd_set* fds)
+GCC_ONLY(__attribute__((nonnull)))
+static int update_fdset(fd_set* restrict fds)
 {
   int fdmax = socketfd;
   size_t i;
@@ -403,9 +404,9 @@ static int connection_closed(int client)
  *                as success (ECONNRESET cause 1 to be returned),
  *                and are handled appropriately.
  */
-static int send_message(size_t conn, char* buf, size_t n)
+static int send_message(size_t conn, char* restrict buf, size_t n)
 {
-  struct ring* ring = outbound + conn;
+  struct ring* restrict ring = outbound + conn;
   int fd = connections[conn];
   int saved_errno;
   size_t ptr = 0;
@@ -519,9 +520,10 @@ static inline int continue_send(size_t conn)
  *                      0: Success (possibily delayed)
  *                      -1: An error occurred
  */
-static int (send_error)(size_t conn, const char* message_id, const char* desc)
+GCC_ONLY(__attribute__((nonnull)))
+static int (send_error)(size_t conn, const char* restrict message_id, const char* restrict desc)
 {
-  char* buf;
+  char* restrict buf;
   size_t n;
   
   MAKE_MESSAGE(&buf, &n, 0,
@@ -558,9 +560,10 @@ static int (send_error)(size_t conn, const char* message_id, const char* desc)
  *                      0: Success (possibily delayed)
  *                      -1: An error occurred
  */
-static int (send_errno)(size_t conn, const char* message_id, int number)
+GCC_ONLY(__attribute__((nonnull)))
+static int (send_errno)(size_t conn, const char* restrict message_id, int number)
 {
-  char* buf;
+  char* restrict buf;
   size_t n;
   
   MAKE_MESSAGE(&buf, &n, 0,
@@ -582,10 +585,11 @@ static int (send_errno)(size_t conn, const char* message_id, int number)
  * @return              Zero on success (even if ignored), -1 on error,
  *                      1 if connection closed
  */
-static int enumerate_crtcs(size_t conn, char* message_id)
+GCC_ONLY(__attribute__((nonnull)))
+static int enumerate_crtcs(size_t conn, const char* restrict message_id)
 {
   size_t i, n = 0, len;
-  char* buf;
+  char* restrict buf;
   
   for (i = 0; i < outputs_n; i++)
     n += strlen(outputs[i].name) + 1;
@@ -618,10 +622,11 @@ static int enumerate_crtcs(size_t conn, char* message_id)
  * @return              Zero on success (even if ignored), -1 on error,
  *                      1 if connection closed
  */
-static int get_gamma_info(size_t conn, char* message_id, char* crtc)
+GCC_ONLY(__attribute__((nonnull(2))))
+static int get_gamma_info(size_t conn, const char* restrict message_id, const char* restrict crtc)
 {
-  struct output* output;
-  char* buf;
+  struct output* restrict output;
+  char* restrict buf;
   char depth[3];
   const char* supported;
   size_t n;
@@ -676,13 +681,15 @@ static int get_gamma_info(size_t conn, char* message_id, char* crtc)
  * @return                 Zero on success (even if ignored), -1 on error,
  *                         1 if connection closed
  */
-static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
-		     char* high_priority, char* low_priority)
+GCC_ONLY(__attribute__((nonnull(2))))
+static int get_gamma(size_t conn, const char* restrict message_id, const char* restrict crtc,
+		     const char* restrict coalesce, const char* restrict high_priority,
+		     const char* restrict low_priority)
 {
-  struct output* output;
+  struct output* restrict output;
   int64_t high, low;
   int coal;
-  char* buf;
+  char* restrict buf;
   size_t start, end, len, n, i;
   char depth[3];
   char tables[sizeof("Tables: \n") + 3 * sizeof(size_t)];
@@ -806,13 +813,15 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
  * @return              Zero on success (even if ignored), -1 on error,
  *                      1 if connection closed
  */
-static int set_gamma(size_t conn, char* message_id, char* crtc, char* priority, char* class, char* lifespan)
+GCC_ONLY(__attribute__((nonnull(2))))
+static int set_gamma(size_t conn, const char* restrict message_id, const char* restrict crtc,
+		     const char* restrict priority, const char* restrict class, const char* restrict lifespan)
 {
-  struct message* msg = inbound + conn;
-  struct output* output = NULL;
+  struct message* restrict msg = inbound + conn;
+  struct output* restrict output = NULL;
   struct filter filter;
-  char* p;
-  char* q;
+  char* restrict p;
+  char* restrict q;
   int saved_errno;
   ssize_t r;
   
@@ -898,17 +907,17 @@ static int set_gamma(size_t conn, char* message_id, char* crtc, char* priority, 
  */
 static int handle_connection(size_t conn)
 {
-  struct message* msg = inbound + conn;
+  struct message* restrict msg = inbound + conn;
   int r, fd = connections[conn];
-  char* command       = NULL;
-  char* crtc          = NULL;
-  char* coalesce      = NULL;
-  char* high_priority = NULL;
-  char* low_priority  = NULL;
-  char* priority      = NULL;
-  char* class         = NULL;
-  char* lifespan      = NULL;
-  char* message_id    = NULL;
+  const char* command       = NULL;
+  const char* crtc          = NULL;
+  const char* coalesce      = NULL;
+  const char* high_priority = NULL;
+  const char* low_priority  = NULL;
+  const char* priority      = NULL;
+  const char* class         = NULL;
+  const char* lifespan      = NULL;
+  const char* message_id    = NULL;
   size_t i;
   
  again:

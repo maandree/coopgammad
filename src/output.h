@@ -24,6 +24,16 @@
 
 
 
+#ifndef GCC_ONLY
+# if defined(__GNUC__) && !defined(__clang__)
+#  define GCC_ONLY(...)  __VA_ARGS__
+# else
+#  define GCC_ONLY(...)  /* nothing */
+# endif
+#endif
+
+
+
 /**
  * Copy the ramp sizes
  * 
@@ -91,12 +101,12 @@ struct output
    * followed by a dot and the name of the
    * connector
    */
-  char* name;
+  char* restrict name;
   
   /**
    * The libgamma state for the output
    */
-  libgamma_crtc_state_t* crtc;
+  libgamma_crtc_state_t* restrict crtc;
   
   /**
    * Saved gamma ramps
@@ -106,7 +116,7 @@ struct output
   /**
    * The table of all applied filters
    */
-  struct filter* table_filters;
+  struct filter* restrict table_filters;
   
   /**
    * `.table_sums[i]` is the resulting
@@ -115,7 +125,7 @@ struct output
    * including `.table_filters[i]` has
    * been applied
    */
-  union gamma_ramps* table_sums;
+  union gamma_ramps* restrict table_sums;
   
   /**
    * The number of elements allocated
@@ -140,7 +150,8 @@ struct output
  * 
  * @param  this  The output
  */
-void output_destroy(struct output* this);
+GCC_ONLY(__attribute__((nonnull)))
+void output_destroy(struct output* restrict this);
 
 /**
  * Marshal an output
@@ -151,7 +162,8 @@ void output_destroy(struct output* this);
  *                needs to be
  * @return        The number of marshalled byte
  */
-size_t output_marshal(const struct output* this, void* buf);
+GCC_ONLY(__attribute__((nonnull(1))))
+size_t output_marshal(const struct output* restrict this, void* restrict buf);
 
 /**
  * Unmarshal an output
@@ -160,7 +172,8 @@ size_t output_marshal(const struct output* this, void* buf);
  * @param   buf   Buffer with the marshalled output
  * @return        The number of unmarshalled bytes, 0 on error
  */
-size_t output_unmarshal(struct output* this, const void* buf);
+GCC_ONLY(__attribute__((nonnull)))
+size_t output_unmarshal(struct output* restrict this, const void* restrict buf);
 
 /**
  * Compare to outputs by the names of their respective CRTC:s
@@ -170,10 +183,8 @@ size_t output_unmarshal(struct output* this, const void* buf);
  * @return     See description of `a` and `b`,
  *             0 if returned if they are the same
  */
-#if defined(__GNUC__)
-__attribute__((pure))
-#endif
-int output_cmp_by_name(const void* a, const void* b);
+GCC_ONLY(__attribute__((pure, nonnull)))
+int output_cmp_by_name(const void* restrict a, const void* restrict b);
 
 /**
  * Find an output by its name
@@ -183,10 +194,8 @@ int output_cmp_by_name(const void* a, const void* b);
  * @param   n     The number of elements in `base`
  * @return        Output find in `base`, `NULL` if not found
  */
-#if defined(__GNUC__)
-__attribute__((pure))
-#endif
-struct output* output_find_by_name(const char* key, struct output* base, size_t n);
+GCC_ONLY(__attribute__((pure, nonnull)))
+struct output* output_find_by_name(const char* restrict key, struct output* restrict base, size_t n);
 
 /**
  * Add a filter to an output
@@ -195,7 +204,8 @@ struct output* output_find_by_name(const char* key, struct output* base, size_t 
  * @param   filter  The filter
  * @return          The index given to the filter, -1 on error
  */
-ssize_t add_filter(struct output* output, struct filter* filter);
+GCC_ONLY(__attribute__((nonnull)))
+ssize_t add_filter(struct output* restrict output, struct filter* restrict filter);
 
 /**
  * Recalculate the resulting gamma and
@@ -205,7 +215,8 @@ ssize_t add_filter(struct output* output, struct filter* filter);
  * @param   first_updated  The index of the first added or removed filter
  * @return                 Zero on success, -1 on error
  */
-int flush_filters(struct output* output, size_t first_updated);
+GCC_ONLY(__attribute__((nonnull)))
+int flush_filters(struct output* restrict output, size_t first_updated);
 
 /**
  * Make identity mapping ramps
@@ -214,5 +225,6 @@ int flush_filters(struct output* output, size_t first_updated);
  * @param   output  The output for which the ramps shall be configured
  * @return          Zero on success, -1 on error
  */
-int make_plain_ramps(union gamma_ramps* ramps, struct output* output);
+GCC_ONLY(__attribute__((nonnull)))
+int make_plain_ramps(union gamma_ramps* restrict ramps, struct output* restrict output);
 

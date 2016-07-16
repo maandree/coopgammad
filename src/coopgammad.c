@@ -45,18 +45,28 @@
 
 
 
-extern char* argv0_real;
-extern struct output* outputs;
+#ifndef GCC_ONLY
+# if defined(__GNUC__) && !defined(__clang__)
+#  define GCC_ONLY(...)  __VA_ARGS__
+# else
+#  define GCC_ONLY(...)  /* nothing */
+# endif
+#endif
+
+
+
+extern char* restrict argv0_real;
+extern struct output* restrict outputs;
 extern size_t outputs_n;
 extern int socketfd;
-extern char* pidpath;
-extern char* socketpath;
+extern char* restrict pidpath;
+extern char* restrict socketpath;
 extern int gerror;
 extern int method;
-extern char* sitename;
+extern char* restrict sitename;
 extern libgamma_site_state_t site;
-extern libgamma_partition_state_t* partitions;
-extern libgamma_crtc_state_t* crtcs;
+extern libgamma_partition_state_t* restrict partitions;
+extern libgamma_crtc_state_t* restrict crtcs;
 extern volatile sig_atomic_t reexec;
 extern volatile sig_atomic_t terminate;
 extern volatile sig_atomic_t connection;
@@ -66,18 +76,18 @@ extern volatile sig_atomic_t connection;
 /**
  * The name of the process
  */
-char* argv0;
+char* restrict argv0;
 
 /**
  * The real pathname of the process's binary,
  * `NULL` if `argv0` is satisfactory
  */
-char* argv0_real = NULL;
+char* restrict argv0_real = NULL;
 
 /**
  * Array of all outputs
  */
-struct output* outputs = NULL;
+struct output* restrict outputs = NULL;
 
 /**
  * The nubmer of elements in `outputs`
@@ -92,12 +102,12 @@ int socketfd = -1;
 /**
  * The pathname of the PID file
  */
-char* pidpath = NULL;
+char* restrict pidpath = NULL;
 
 /**
  * The pathname of the socket
  */
-char* socketpath = NULL;
+char* restrict socketpath = NULL;
 
 /**
  * Error code returned by libgamma
@@ -112,7 +122,7 @@ int method = -1;
 /**
  * The site's name, may be `NULL`
  */
-char* sitename = NULL;
+char* restrict sitename = NULL;
 
 /**
  * The libgamma site state
@@ -122,12 +132,12 @@ libgamma_site_state_t site;
 /**
  * The libgamma partition states
  */
-libgamma_partition_state_t* partitions = NULL;
+libgamma_partition_state_t* restrict partitions = NULL;
 
 /**
  * The libgamma CRTC states
  */
-libgamma_crtc_state_t* crtcs = NULL;
+libgamma_crtc_state_t* restrict crtcs = NULL;
 
 /**
  * Has the process receive a signal
@@ -196,14 +206,15 @@ static void sig_connection(int signo)
  * @param   suffix  The suffix for the file
  * @return          The pathname of the file, `NULL` on error
  */
-static char* get_pathname(const char* suffix)
+GCC_ONLY(__attribute__((malloc, nonnull)))
+static char* get_pathname(const char* restrict suffix)
 {
-  const char* rundir = getenv("XDG_RUNTIME_DIR");
-  const char* username = "";
+  const char* restrict rundir = getenv("XDG_RUNTIME_DIR");
+  const char* restrict username = "";
   char* name = NULL;
   char* p;
-  char* rc;
-  struct passwd* pw;
+  char* restrict rc;
+  struct passwd* restrict pw;
   size_t n;
   int saved_errno;
   
@@ -260,6 +271,7 @@ static char* get_pathname(const char* suffix)
  * 
  * @return  The pathname of the socket, `NULL` on error
  */
+GCC_ONLY(__attribute__((malloc)))
 static inline char* get_socket_pathname(void)
 {
   return get_pathname(".socket");
@@ -271,6 +283,7 @@ static inline char* get_socket_pathname(void)
  * 
  * @return  The pathname of the PID file, `NULL` on error
  */
+GCC_ONLY(__attribute__((malloc)))
 static inline char* get_pidfile_pathname(void)
 {
   return get_pathname(".pid");
@@ -282,6 +295,7 @@ static inline char* get_pidfile_pathname(void)
  * 
  * @return  The pathname of the state file, `NULL` on error
  */
+GCC_ONLY(__attribute__((malloc)))
 static inline char* get_state_pathname(void)
 {
   return get_pathname(".state");
@@ -294,13 +308,14 @@ static inline char* get_state_pathname(void)
  * @param   arg  The adjustment method name (or stringised number)
  * @return       The adjustment method, -1 (negative) on error
  */
-static int get_method(char* arg)
+GCC_ONLY(__attribute__((nonnull)))
+static int get_method(const char* restrict arg)
 {
 #if LIBGAMMA_METHOD_MAX > 5
 # warning libgamma has added more adjustment methods
 #endif
   
-  char* p;
+  const char* restrict p;
   
   if (!strcmp(arg, "dummy"))    return LIBGAMMA_METHOD_DUMMY;
   if (!strcmp(arg, "randr"))    return LIBGAMMA_METHOD_X_RANDR;
@@ -331,7 +346,9 @@ static int get_method(char* arg)
  * @param   crtc  libgamma's state for the CRTC
  * @return        The name of the CRTC, `NULL` on error
  */
-static char* get_crtc_name(libgamma_crtc_information_t* info, libgamma_crtc_state_t* crtc)
+GCC_ONLY(__attribute__((nonnull)))
+static char* get_crtc_name(const libgamma_crtc_information_t* restrict info,
+			   const libgamma_crtc_state_t* restrict crtc)
 {
   if ((info->edid_error == 0) && (info->edid != NULL))
     return libgamma_behex_edid(info->edid, info->edid_length);
@@ -362,7 +379,8 @@ static char* get_crtc_name(libgamma_crtc_information_t* info, libgamma_crtc_stat
  *                    0: The service is already running
  *                    1: The PID file is outdated
  */
-static int is_pidfile_reusable(const char* pidfile, const char* token)
+GCC_ONLY(__attribute__((nonnull)))
+static int is_pidfile_reusable(const char* restrict pidfile, const char* restrict token)
 {
   /* PORTERS: /proc/$PID/environ is Linux specific */
   
@@ -456,11 +474,12 @@ static int is_pidfile_reusable(const char* pidfile, const char* token)
  * @return           Zero on success, -1 on error,
  *                   -2 if the service is already running
  */
+GCC_ONLY(__attribute__((nonnull)))
 static int create_pidfile(char* pidfile)
 {
   int fd, r, saved_errno;
   char* p;
-  char* token;
+  char* restrict token;
   
   /* Create token used to validate the service. */
   token = malloc(sizeof("COOPGAMMAD_PIDFILE_TOKEN=") + strlen(pidfile));
@@ -543,7 +562,7 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
   struct rlimit rlimit;
   size_t i, j, n, n0;
   sigset_t mask;
-  char* sitename_dup = NULL;
+  char* restrict sitename_dup = NULL;
   int r;
   
   /* Zero out some memory so it can be destoried safely. */
@@ -966,10 +985,10 @@ static void destroy(int full)
  *               buffer needs to be
  * @return       The number of marshalled bytes
  */
-static size_t marshal(void* buf)
+static size_t marshal(void* restrict buf)
 {
   size_t off = 0, i, n;
-  char* bs = buf;
+  char* restrict bs = buf;
   
   if (bs != NULL)
     *(int*)(bs + off) = MARSHAL_VERSION;
@@ -1041,10 +1060,11 @@ static size_t marshal(void* buf)
  * @param   buf  Buffer with the marshalled data
  * @return       The number of marshalled bytes, 0 on error
  */
-static size_t unmarshal(void* buf)
+GCC_ONLY(__attribute__((nonnull)))
+static size_t unmarshal(void* restrict buf)
 {
   size_t off = 0, i, n;
-  char* bs = buf;
+  char* restrict bs = buf;
   
   if (*(int*)(bs + off) != MARSHAL_VERSION)
     {
@@ -1125,10 +1145,11 @@ static size_t unmarshal(void* buf)
  * @param   statefile  The state file
  * @return             Zero on success, -1 on error
  */
-static int unmarshal_and_merge_state(const char* statefile)
+GCC_ONLY(__attribute__((nonnull)))
+static int unmarshal_and_merge_state(const char* restrict statefile)
 {
-  struct output* new_outputs = outputs;
-  struct output* old_outputs = NULL;
+  struct output* restrict new_outputs = outputs;
+  struct output* restrict old_outputs = NULL;
   size_t new_outputs_n = outputs_n;
   size_t old_outputs_n = 0;
   size_t i, j, k;
@@ -1221,7 +1242,7 @@ static int unmarshal_and_merge_state(const char* statefile)
  */
 static int print_method_and_site(int query)
 {
-  const char* methodname = NULL;
+  const char* restrict methodname = NULL;
   char* p;
   
   if (query == 1)

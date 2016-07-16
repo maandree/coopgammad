@@ -28,7 +28,7 @@
 /**
  * The name of the process
  */
-extern char* argv0;
+extern char* restrict argv0;
 
 
 
@@ -42,7 +42,7 @@ extern char* argv0;
  * @param   ramps_size  The byte-size of ramps
  * @return              The number of marshalled byte
  */
-size_t gamma_ramps_marshal(const union gamma_ramps* this, void* buf, size_t ramps_size)
+size_t gamma_ramps_marshal(const union gamma_ramps* restrict this, void* restrict buf, size_t ramps_size)
 {
   if (buf != NULL)
     memcpy(buf, this->u8.red, ramps_size);
@@ -59,7 +59,7 @@ size_t gamma_ramps_marshal(const union gamma_ramps* this, void* buf, size_t ramp
  * @param   ramps_size  The byte-size of ramps
  * @return              The number of unmarshalled bytes, 0 on error
  */
-size_t gamma_ramps_unmarshal(union gamma_ramps* this, const void* buf, size_t ramps_size)
+size_t gamma_ramps_unmarshal(union gamma_ramps* restrict this, const void* restrict buf, size_t ramps_size)
 {
   size_t depth = ramps_size / (this->u8.red_size + this->u8.green_size + this->u8.blue_size);
   int r = 0;
@@ -109,7 +109,8 @@ size_t gamma_ramps_unmarshal(union gamma_ramps* this, const void* buf, size_t ra
  * @param  base         The CLUT on top of which the new filter should be applied,
  *                      this can be the same pointer as `dest`
  */
-void apply(union gamma_ramps* dest, void* application, int depth, union gamma_ramps* base)
+void apply(union gamma_ramps* restrict dest, void* restrict application,
+	   int depth, union gamma_ramps* restrict base)
 {
   union gamma_ramps app;
   size_t bytedepth;

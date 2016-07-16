@@ -20,6 +20,16 @@
 
 
 
+#ifndef GCC_ONLY
+# if defined(__GNUC__) && !defined(__clang__)
+#  define GCC_ONLY(...)  __VA_ARGS__
+# else
+#  define GCC_ONLY(...)  /* nothing */
+# endif
+#endif
+
+
+
 /**
  * Message passed between a server and a client
  */
@@ -33,7 +43,7 @@ struct message
    * but `headers` itself is `NULL` if there are no headers.
    * The "Length" header should be included in this list.
    */
-  char** headers;
+  char** restrict headers;
   
   /**
    * The number of headers in the message
@@ -43,7 +53,7 @@ struct message
   /**
    * The payload of the message, `NULL` if none (of zero-length)
    */
-  char* payload;
+  char* restrict payload;
   
   /**
    * The size of the payload
@@ -58,7 +68,7 @@ struct message
   /**
    * Internal buffer for the reading function (internal data)
    */
-  char* buffer;
+  char* restrict buffer;
   
   /**
    * The size allocated to `buffer` (internal data)
@@ -90,7 +100,8 @@ struct message
  * @param   this  Memory slot in which to store the new message
  * @return        Non-zero on error, `errno` will be set accordingly
  */
-int message_initialise(struct message* this);
+GCC_ONLY(__attribute__((nonnull)))
+int message_initialise(struct message* restrict this);
 
 /**
  * Release all resources in a message, should
@@ -98,7 +109,8 @@ int message_initialise(struct message* this);
  * 
  * @param  this  The message
  */
-void message_destroy(struct message* this);
+GCC_ONLY(__attribute__((nonnull)))
+void message_destroy(struct message* restrict this);
 
 /**
  * Marshal a message for state serialisation
@@ -109,7 +121,8 @@ void message_destroy(struct message* this);
  *               needs to be
  * @return       The number of marshalled byte
  */
-size_t message_marshal(const struct message* this, void* buf);
+GCC_ONLY(__attribute__((nonnull(1))))
+size_t message_marshal(const struct message* restrict this, void* restrict buf);
 
 /**
  * Unmarshal a message for state deserialisation
@@ -118,7 +131,8 @@ size_t message_marshal(const struct message* this, void* buf);
  * @param   buf   In buffer with the marshalled data
  * @return        The number of unmarshalled bytes, 0 on error
  */
-size_t message_unmarshal(struct message* this, const void* buf);
+GCC_ONLY(__attribute__((nonnull)))
+size_t message_unmarshal(struct message* restrict this, const void* restrict buf);
 
 /**
  * Read the next message from a file descriptor
@@ -134,5 +148,6 @@ size_t message_unmarshal(struct message* this, const void* buf);
  *                  Other:        Failure
  *                -2: Corrupt message (unrecoverable)
  */
-int message_read(struct message* this, int fd);
+GCC_ONLY(__attribute__((nonnull)))
+int message_read(struct message* restrict this, int fd);
 

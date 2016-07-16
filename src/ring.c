@@ -27,7 +27,7 @@
  * 
  * @param  this  The ring buffer
  */
-void ring_initialise(struct ring* this)
+void ring_initialise(struct ring* restrict this)
 {
   this->start  = 0;
   this->end    = 0;
@@ -41,7 +41,7 @@ void ring_initialise(struct ring* this)
  * 
  * @param  this  The ring buffer
  */
-void ring_destroy(struct ring* this)
+void ring_destroy(struct ring* restrict this)
 {
   free(this->buffer);
 }
@@ -63,7 +63,7 @@ void ring_destroy(struct ring* this)
  *                is needed
  * @return        The number of marshalled bytes
  */
-size_t ring_marshal(const struct ring* this, void* buf)
+size_t ring_marshal(const struct ring* restrict this, void* restrict buf)
 {
   size_t off = 0, n = this->end - this->start;
   char* bs = buf;
@@ -87,7 +87,7 @@ size_t ring_marshal(const struct ring* this, void* buf)
  * @param   buf   Buffer with the marshalled data
  * @return        The number of unmarshalled bytes, 0 on error
  */
-size_t ring_unmarshal(struct ring* this, const void* buf)
+size_t ring_unmarshal(struct ring* restrict this, const void* restrict buf)
 {
   size_t off = 0;
   const char* bs = buf;
@@ -124,7 +124,7 @@ size_t ring_unmarshal(struct ring* this, const void* buf)
  * @param   n     The number of bytes in `data`
  * @return        Zero on success, -1 on error
  */
-int ring_push(struct ring* this, void* data, size_t n)
+int ring_push(struct ring* restrict this, void* restrict data, size_t n)
 {
   size_t used = 0;
   
@@ -140,7 +140,7 @@ int ring_push(struct ring* this, void* data, size_t n)
   
   if (used + n > this->size)
     {
-      char* new = malloc(used + n);
+      char* restrict new = malloc(used + n);
       if (new == NULL)
 	return -1;
       if (this->buffer)
@@ -189,7 +189,7 @@ int ring_push(struct ring* this, void* data, size_t n)
  * @return        The beginning of the queued data,
  *                `NULL` if there is nothing more
  */
-void* ring_peek(struct ring* this, size_t* n)
+void* ring_peek(struct ring* restrict this, size_t* restrict n)
 {
   if (this->buffer == NULL)
     return *n = 0, NULL;
@@ -208,7 +208,7 @@ void* ring_peek(struct ring* this, size_t* n)
  * @param  this  The ring buffer
  * @param  n     The number of bytes to dequeue
  */
-void ring_pop(struct ring* this, size_t n)
+void ring_pop(struct ring* restrict this, size_t n)
 {
   this->start += n;
   this->start %= this->size;

@@ -22,13 +22,23 @@
 
 
 
+#ifndef GCC_ONLY
+# if defined(__GNUC__) && !defined(__clang__)
+#  define GCC_ONLY(...)  __VA_ARGS__
+# else
+#  define GCC_ONLY(...)  /* nothing */
+# endif
+#endif
+
+
+
 /**
  * List of all client's file descriptors
  * 
  * Unused slots, with index less than `connections_used`,
  * should have the value -1 (negative)
  */
-extern int* connections;
+extern int* restrict connections;
 
 /**
  * The number of elements allocated for `connections`
@@ -48,12 +58,12 @@ extern size_t connections_used;
 /**
  * The clients' connections' inbound-message buffers
  */
-extern struct message* inbound;
+extern struct message* restrict inbound;
 
 /**
  * The clients' connections' outbound-message buffers
  */
-extern struct ring* outbound;
+extern struct ring* restrict outbound;
 
 
 
@@ -72,7 +82,7 @@ void server_destroy(int disconnect);
  *               this buffer needs
  * @return       The number of marshalled bytes
  */
-size_t server_marshal(void* buf);
+size_t server_marshal(void* restrict buf);
 
 /**
  * Unmarshal the state of the connections
@@ -80,7 +90,7 @@ size_t server_marshal(void* buf);
  * @param   buf  Buffer for the marshalled data
  * @return       The number of unmarshalled bytes, 0 on error
  */
-size_t server_unmarshal(const void* buf);
+size_t server_unmarshal(const void* restrict buf);
 
 /**
  * The program's main loop

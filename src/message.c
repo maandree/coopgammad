@@ -33,7 +33,7 @@
  * @param   this  Memory slot in which to store the new message
  * @return        Non-zero on error, `errno` will be set accordingly
  */
-int message_initialise(struct message* this)
+int message_initialise(struct message* restrict this)
 {
   this->headers = NULL;
   this->header_count = 0;
@@ -56,7 +56,7 @@ int message_initialise(struct message* this)
  * 
  * @param  this  The message
  */
-void message_destroy(struct message* this)
+void message_destroy(struct message* restrict this)
 {
   size_t i;
   if (this->headers != NULL)
@@ -85,7 +85,7 @@ void message_destroy(struct message* this)
  *               needs to be
  * @return       The number of marshalled byte
  */
-size_t message_marshal(const struct message* this, void* buf)
+size_t message_marshal(const struct message* restrict this, void* restrict buf)
 {
   size_t i, n, off = 0;
   char* bs = buf;
@@ -137,7 +137,7 @@ size_t message_marshal(const struct message* this, void* buf)
  * @param   buf   In buffer with the marshalled data
  * @return        The number of unmarshalled bytes, 0 on error
  */
-size_t message_unmarshal(struct message* this, const void* buf)
+size_t message_unmarshal(struct message* restrict this, const void* restrict buf)
 {
   size_t i, n, off = 0, header_count;
   const char* bs = buf;
@@ -236,7 +236,8 @@ size_t message_unmarshal(struct message* this, const void* buf)
  * @param   extent  The number of additional entries
  * @return          Zero on success, -1 on error
  */
-static int extend_headers(struct message* this, size_t extent)
+GCC_ONLY(__attribute__((nonnull)))
+static int extend_headers(struct message* restrict this, size_t extent)
 {
   char** new;
   if (!(new = realloc(this->headers, (this->header_count + extent) * sizeof(char*))))
@@ -252,9 +253,10 @@ static int extend_headers(struct message* this, size_t extent)
  * @param   this  The message
  * @return        Zero on success, -1 on error
  */
-static int extend_buffer(struct message* this)
+GCC_ONLY(__attribute__((nonnull)))
+static int extend_buffer(struct message* restrict this)
 {
-  char* new;
+  char* restrict new;
   if (!(new = realloc(this->buffer, (this->buffer_size << 1) * sizeof(char))))
     return -1;
   this->buffer = new;
@@ -268,7 +270,8 @@ static int extend_buffer(struct message* this)
  * 
  * @param  this  The message
  */
-static void reset_message(struct message* this)
+GCC_ONLY(__attribute__((nonnull)))
+static void reset_message(struct message* restrict this)
 {
   size_t i;
   if (this->headers != NULL)
@@ -291,10 +294,8 @@ static void reset_message(struct message* this)
  * @param   this  The message
  * @return        Zero on success, negative on error (malformated message: unrecoverable state)
  */
-#if defined(__GNUC__)
-__attribute__((pure))
-#endif
-static int get_payload_length(struct message* this)
+GCC_ONLY(__attribute__((pure, nonnull)))
+static int get_payload_length(struct message* restrict this)
 {
   char* header;
   size_t i;
@@ -326,12 +327,10 @@ static int get_payload_length(struct message* this)
  * @param   length  The length of the header
  * @return          Zero if valid, negative if invalid (malformated message: unrecoverable state)
  */
-#if defined(__GNUC__)
-__attribute__((pure))
-#endif
-static int validate_header(const char* header, size_t length)
+GCC_ONLY(__attribute__((pure, nonnull)))
+static int validate_header(const char* restrict header, size_t length)
 {
-  char* p = memchr(header, ':', length * sizeof(char));
+  char* restrict p = memchr(header, ':', length * sizeof(char));
   
   if (verify_utf8(header, 0) < 0)
     /* Either the string is not UTF-8, or your are under an UTF-8 attack,
@@ -353,7 +352,8 @@ static int validate_header(const char* header, size_t length)
  * @param  length      The number of characters to remove  
  * @param  update_ptr  Whether to update the buffer pointer
  */
-static void unbuffer_beginning(struct message* this, size_t length, int update_ptr)
+GCC_ONLY(__attribute__((nonnull)))
+static void unbuffer_beginning(struct message* restrict this, size_t length, int update_ptr)
 {
   memmove(this->buffer, this->buffer + length, (this->buffer_ptr - length) * sizeof(char));
   if (update_ptr)
@@ -368,7 +368,8 @@ static void unbuffer_beginning(struct message* this, size_t length, int update_p
  * @param   this  The message
  * @return        The return value follows the rules of `message_read`
  */
-static int initialise_payload(struct message* this)
+GCC_ONLY(__attribute__((nonnull)))
+static int initialise_payload(struct message* restrict this)
 {
   /* Remove the \n (end of empty line) we found from the buffer. */
   unbuffer_beginning(this, 1, 1);
@@ -393,9 +394,10 @@ static int initialise_payload(struct message* this)
  * @param   length  The length of the header, including LF-termination
  * @return          The return value follows the rules of `message_read`
  */
-static int store_header(struct message* this, size_t length)
+GCC_ONLY(__attribute__((nonnull)))
+static int store_header(struct message* restrict this, size_t length)
 {
-  char* header;
+  char* restrict header;
   
   /* Allocate the header. */
   if (!(header = malloc(length))) /* Last char is a LF, which is substituted with NUL. */
@@ -430,7 +432,8 @@ static int store_header(struct message* this, size_t length)
  * @param   fd    The file descriptor of the socket
  * @return        The return value follows the rules of `message_read`
  */
-static int continue_read(struct message* this, int fd)
+GCC_ONLY(__attribute__((nonnull)))
+static int continue_read(struct message* restrict this, int fd)
 {
   size_t n;
   ssize_t got;
@@ -480,7 +483,8 @@ static int continue_read(struct message* this, int fd)
  *                  Other:        Failure
  *                -2: Corrupt message (unrecoverable)
  */
-int message_read(struct message* this, int fd)
+GCC_ONLY(__attribute__((nonnull)))
+int message_read(struct message* restrict this, int fd)
 {
   size_t header_commit_buffer = 0;
   int r;

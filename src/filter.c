@@ -29,7 +29,7 @@
  * 
  * @param  this  The filter
  */
-void filter_destroy(struct filter* this)
+void filter_destroy(struct filter* restrict this)
 {
   free(this->class);
   free(this->ramps);
@@ -52,11 +52,11 @@ void filter_destroy(struct filter* this)
  * @param   ramps_size  The byte-size of `this->ramps`
  * @return              The number of marshalled byte
  */
-size_t filter_marshal(const struct filter* this, void* buf, size_t ramps_size)
+size_t filter_marshal(const struct filter* restrict this, void* restrict buf, size_t ramps_size)
 {
   size_t off = 0, n;
   char nonnulls = 0;
-  char* bs = buf;
+  char* restrict bs = buf;
   
   if (bs != NULL)
     {
@@ -101,11 +101,11 @@ size_t filter_marshal(const struct filter* this, void* buf, size_t ramps_size)
  * @param   ramps_size  The byte-size of `this->ramps`
  * @return              The number of unmarshalled bytes, 0 on error
  */
-size_t filter_unmarshal(struct filter* this, const void* buf, size_t ramps_size)
+size_t filter_unmarshal(struct filter* restrict this, const void* restrict buf, size_t ramps_size)
 {
   size_t off = 0, n;
   char nonnulls = 0;
-  const char* bs = buf;
+  const char* restrict bs = buf;
   
   nonnulls = *(bs + off);
   off += 1;
