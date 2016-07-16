@@ -31,6 +31,12 @@
 
 
 
+#if defined(__clang__)
+# pragma GCC diagnostic ignored "-Wswitch-enum"
+#endif
+
+
+
 /**
  * List of all client's file descriptors
  * 
@@ -148,6 +154,13 @@ void server_destroy(int disconnect)
 }
 
 
+
+#if defined(__clang__)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wcast-align"
+#endif
+
+
 /**
  * Marshal the state of the connections
  * 
@@ -229,6 +242,12 @@ size_t server_unmarshal(const void* buf)
   
   return off;
 }
+
+
+#if defined(__clang__)
+# pragma GCC diagnostic pop
+#endif
+
 
 
 /**
@@ -330,7 +349,7 @@ static int handle_server(void)
  * Handle a closed connection
  * 
  * @param   client  The file descriptor for the client
- * @retunr          Zero on success, -1 on error
+ * @return          Zero on success, -1 on error
  */
 static int connection_closed(int client)
 {
@@ -564,7 +583,7 @@ static int enumerate_crtcs(size_t conn, char* message_id)
     n += strlen(outputs[i].name) + 1;
   
   MAKE_MESSAGE(&buf, &n, 0,
-	       "Command: crtc-enumeration%s\n"
+	       "Command: crtc-enumeration\n"
 	       "In response to: %s\n"
 	       "Length: %zu\n"
 	       "\n",
@@ -616,9 +635,9 @@ static int get_gamma_info(size_t conn, char* message_id, char* crtc)
   
   switch (output->supported)
     {
-    case LIBGAMMA_YES:  supported = "yes";    break;
-    case LIBGAMMA_NO:   supported = "no";     break;
-    default:            supported = "maybe";  break;
+    case LIBGAMMA_YES:    supported = "yes";    break;
+    case LIBGAMMA_NO:     supported = "no";     break;
+    default:              supported = "maybe";  break;
     }
   
   MAKE_MESSAGE(&buf, &n, 0,
@@ -747,7 +766,14 @@ static int get_gamma(size_t conn, char* message_id, char* crtc, char* coalesce,
   else
     for (i = start; i < end; i++)
       {
+#if defined(__clang__)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wcast-align"
+#endif
 	*(int64_t*)(buf + n) = output->table_filters[i].priority;
+#if defined(__clang__)
+# pragma GCC diagnostic pop
+#endif
 	n += sizeof(int64_t);
 	len = strlen(output->table_filters[i].class) + 1;
 	memcpy(buf + n, output->table_filters[i].class, len);

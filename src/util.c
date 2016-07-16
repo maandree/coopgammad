@@ -200,7 +200,7 @@ int verify_utf8(const char* string, int allow_modified_nul)
 {
   static long BYTES_TO_MIN_BITS[] = {0, 0,  8, 12, 17, 22, 37};
   static long BYTES_TO_MAX_BITS[] = {0, 7, 11, 16, 21, 26, 31};
-  long bytes = 0, read_bytes = 0, bits = 0, c, character;
+  long bytes = 0, read_bytes = 0, bits = 0, c, character = 0;
   
   /*                                                      min bits  max bits
     0.......                                                 0         7

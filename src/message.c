@@ -69,6 +69,13 @@ void message_destroy(struct message* this)
 }
 
 
+
+#if defined(__clang__)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wcast-align"
+#endif
+
+
 /**
  * Marshal a message for state serialisation
  * 
@@ -214,6 +221,12 @@ size_t message_unmarshal(struct message* this, const void* buf)
  fail:
   return 0;
 }
+
+
+#if defined(__clang__)
+# pragma GCC diagnostic pop
+#endif
+
 
 
 /**

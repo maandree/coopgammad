@@ -47,6 +47,13 @@ void ring_destroy(struct ring* this)
 }
 
 
+
+#if defined(__clang__)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wcast-align"
+#endif
+
+
 /**
  * Marshal a ring buffer
  * 
@@ -101,6 +108,12 @@ size_t ring_unmarshal(struct ring* this, const void* buf)
   
   return off;
 }
+
+
+#if defined(__clang__)
+# pragma GCC diagnostic pop
+#endif
+
 
 
 /**

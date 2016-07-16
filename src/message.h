@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <stddef.h>
+#include <limits.h>
 
 
 
@@ -73,6 +74,10 @@ struct message
    * 0 while reading headers, 1 while reading payload, and 2 when done (internal data)
    */
   int stage;
+
+#if INT_MAX != LONG_MAX
+  int padding__;
+#endif
   
 };
 

@@ -56,6 +56,11 @@ struct output
   signed depth;
   
   /**
+   * Whether gamma ramps are supported
+   */
+  enum libgamma_decision supported;
+  
+  /**
    * The number of stops in the red gamma ramp
    */
   size_t red_size;
@@ -75,11 +80,6 @@ struct output
    * multiplied by the byte-size of each stop
    */
   size_t ramps_size;
-  
-  /**
-   * Whether gamma ramps are supported
-   */
-  enum libgamma_decision supported;
   
   /**
    * The name of the output, will be its EDID

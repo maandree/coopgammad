@@ -60,6 +60,11 @@ struct filter
   int client;
   
   /**
+   * The lifespan of the filter
+   */
+  enum lifespan lifespan;
+  
+  /**
    * The priority of the filter
    */
   int64_t priority;
@@ -68,11 +73,6 @@ struct filter
    * Identifier for the filter
    */
   char* class;
-  
-  /**
-   * The lifespan of the filter
-   */
-  enum lifespan lifespan;
   
   /**
    * The gamma ramp adjustments for the filter.

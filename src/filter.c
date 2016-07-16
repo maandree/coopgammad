@@ -36,6 +36,12 @@ void filter_destroy(struct filter* this)
 }
 
 
+
+#if defined(__clang__)
+# pragma GCC diagnostic ignored "-Wcast-align"
+#endif
+
+
 /**
  * Marshal a filter
  * 

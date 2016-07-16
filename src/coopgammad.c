@@ -45,6 +45,24 @@
 
 
 
+extern char* argv0;
+extern char* argv0_real;
+extern struct output* outputs;
+extern size_t outputs_n;
+extern int socketfd;
+extern char* pidpath;
+extern char* socketpath;
+extern int gerror;
+extern int method;
+extern char* sitename;
+extern libgamma_site_state_t site;
+extern libgamma_partition_state_t* partitions;
+extern libgamma_crtc_state_t* crtcs;
+extern volatile sig_atomic_t reexec;
+extern volatile sig_atomic_t terminate;
+
+
+
 /**
  * The name of the process
  */
@@ -908,6 +926,13 @@ static void destroy(int full)
 }
 
 
+
+#if defined(__clang__)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wcast-align"
+#endif
+
+
 /**
  * Marshal the state of the process
  * 
@@ -1054,6 +1079,12 @@ static size_t unmarshal(void* buf)
   
   return off;
 }
+
+
+#if defined(__clang__)
+# pragma GCC diagnostic pop
+#endif
+
 
 
 /**
@@ -1231,11 +1262,19 @@ static int print_method_and_site(int query)
 /**
  * Print usage information and exit
  */
+#if defined(__GNU__) || defined(__clang__)
+__attribute__((noreturn))
+#endif
 static void usage(void)
 {
   printf("Usage: %s [-m method] [-s site] [-fkpq]\n", argv0);
   exit(1);
 }
+
+
+#if defined(__clang__)
+# pragma GCC diagnostic ignored "-Wdocumentation-unknown-command"
+#endif
 
 
 /**

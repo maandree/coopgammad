@@ -90,6 +90,13 @@ void output_destroy(struct output* this)
 }
 
 
+
+#if defined(__clang__)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wcast-align"
+#endif
+
+
 /**
  * Marshal an output
  * 
@@ -217,6 +224,12 @@ size_t output_unmarshal(struct output* this, const void* buf)
   
   return off;
 }
+
+
+#if defined(__clang__)
+# pragma GCC diagnostic pop
+#endif
+
 
 
 /**
