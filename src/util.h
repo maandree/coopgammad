@@ -94,9 +94,8 @@ void msleep(unsigned ms);
 /**
  * Check whether a NUL-terminated string is encoded in UTF-8
  * 
- * @param   string              The string
- * @param   allow_modified_nul  Whether Modified UTF-8 is allowed, which allows a two-byte encoding for NUL
- * @return                      Zero if good, -1 on encoding error
+ * @param   string  The string
+ * @return          Zero if good, -1 on encoding error
  */
 GCC_ONLY(__attribute__((pure, nonnull)))
 int verify_utf8(const char* restrict string);
