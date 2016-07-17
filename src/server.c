@@ -272,9 +272,9 @@ int main_loop(void)
     {
       if (connection)
 	{
-	  connection = 0;
 	  if ((connection == 1 ? disconnect() : reconnect()) < 0)
-	    return -1;
+	    return connection = 0, -1;
+	  connection = 0;
 	}
       
       memcpy(&fds_rd, &fds_orig, sizeof(fd_set));
@@ -297,39 +297,22 @@ int main_loop(void)
 	{
 	  int do_read  = FD_ISSET(i, &fds_rd) || FD_ISSET(i, &fds_ex);
 	  int do_write = FD_ISSET(i, &fds_wr);
-	  if (do_read || do_write)
+	  if (!do_read && !do_write)
+	    continue;
+	  
+	  if (i == socketfd)
+	    r = handle_server();
+	  else
 	    {
-	      if (i == socketfd)
-		r = handle_server();
-	      else
-		{
-		  for (j = 0;; j++)
-		    if (connections[j] == i)
-		      break;
-		  r = do_read ? handle_connection(j) : 0;
-		}
-	      switch (r)
-		{
-		case 0:
-		  break;
-		case 1:
-		  update = 1;
-		  break;
-		default:
-		  return -1;
-		}
-	      if (do_write)
-		switch (continue_send(j))
-		  {
-		  case 0:
-		    break;
-		  case 1:
-		    update = 1;
-		    break;
-		  default:
-		    return -1;
-		  }
+	      for (j = 0; connections[j] != i; j++);
+	      r = do_read ? handle_connection(j) : 0;
 	    }
+	  
+	  if ((r >= 0) && do_write)
+	    r |= continue_send(j);
+	  if (r < 0)
+	    return -1;
+	  update |= (r > 0);
 	}
       if (update)
 	update_fdset(&fds_orig);

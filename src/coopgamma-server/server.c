@@ -333,3 +333,42 @@ int flush_filters(struct output* restrict output, size_t first_updated)
   return 0;
 }
 
+
+
+/**
+ * Preserve current gamma ramps at priority 0 for all outputs
+ * 
+ * @return  Zero on success, -1 on error
+ */
+int preserve_gamma(void)
+{
+  size_t i;
+  
+  for (i = 0; i < outputs_n; i++)
+    {
+      struct filter filter = {
+	.client   = -1,
+	.priority = 0,
+	.class    = NULL,
+	.lifespan = LIFESPAN_UNTIL_REMOVAL,
+	.ramps    = NULL
+      };
+      outputs[i].table_filters = calloc(4, sizeof(*(outputs[i].table_filters)));
+      outputs[i].table_sums = calloc(4, sizeof(*(outputs[i].table_sums)));
+      outputs[i].table_alloc = 4;
+      outputs[i].table_size = 1;
+      filter.class = memdup(PKGNAME "::" COMMAND "::preserved", sizeof(PKGNAME "::" COMMAND "::preserved"));
+      if (filter.class == NULL)
+	return -1;
+      filter.ramps = memdup(outputs[i].saved_ramps.u8.red, outputs[i].ramps_size);
+      if (filter.ramps == NULL)
+	return -1;
+      outputs[i].table_filters[0] = filter;
+      COPY_RAMP_SIZES(&(outputs[i].table_sums[0].u8), outputs + i);
+      if (!gamma_ramps_unmarshal(outputs[i].table_sums, outputs[i].saved_ramps.u8.red, outputs[i].ramps_size))
+	return -1;
+    }
+  
+  return 0;
+}
+

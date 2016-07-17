@@ -89,5 +89,13 @@ GCC_ONLY(__attribute__((nonnull)))
 int flush_filters(struct output* restrict output, size_t first_updated);
 
 
+/**
+ * Preserve current gamma ramps at priority 0 for all outputs
+ * 
+ * @return  Zero on success, -1 on error
+ */
+int preserve_gamma(void);
+
+
 #endif
 

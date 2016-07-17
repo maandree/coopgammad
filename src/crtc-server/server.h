@@ -19,7 +19,7 @@
 #define CRTC_SERVER_SERVER_H
 
 
-#include <stddef.h>
+#include <libgamma.h>
 
 
 
@@ -43,6 +43,17 @@
  */
 GCC_ONLY(__attribute__((nonnull)))
 int handle_enumerate_crtcs(size_t conn, const char* restrict message_id);
+
+/**
+ * Get the name of a CRTC
+ * 
+ * @param   info  Information about the CRTC
+ * @param   crtc  libgamma's state for the CRTC
+ * @return        The name of the CRTC, `NULL` on error
+ */
+GCC_ONLY(__attribute__((nonnull)))
+char* get_crtc_name(const libgamma_crtc_information_t* restrict info,
+		    const libgamma_crtc_state_t* restrict crtc);
 
 
 #endif

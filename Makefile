@@ -9,6 +9,7 @@ SRC = \
 	util				\
 	communication			\
 	state				\
+	kernel				\
 	crtc-server/server		\
 	gamma-server/server		\
 	coopgamma-server/server		\

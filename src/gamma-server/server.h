@@ -56,6 +56,25 @@ int handle_get_gamma_info(size_t conn, const char* restrict message_id, const ch
 GCC_ONLY(__attribute__((nonnull)))
 void set_gamma(const struct output* restrict output, const union gamma_ramps* restrict ramps);
 
+
+/**
+ * Store all current gamma ramps
+ * 
+ * @return  Zero on success, -1 on error
+ */
+int initialise_gamma_info(void);
+
+/**
+ * Store all current gamma ramps
+ */
+void store_gamma(void);
+
+/**
+ * Restore all gamma ramps
+ */
+void restore_gamma(void);
+
+
 /**
  * Disconnect from the site
  * 

@@ -57,3 +57,32 @@ int handle_enumerate_crtcs(size_t conn, const char* restrict message_id)
   return send_message(conn, buf, n);
 }
 
+
+/**
+ * Get the name of a CRTC
+ * 
+ * @param   info  Information about the CRTC
+ * @param   crtc  libgamma's state for the CRTC
+ * @return        The name of the CRTC, `NULL` on error
+ */
+char* get_crtc_name(const libgamma_crtc_information_t* restrict info,
+		    const libgamma_crtc_state_t* restrict crtc)
+{
+  if ((info->edid_error == 0) && (info->edid != NULL))
+    return libgamma_behex_edid(info->edid, info->edid_length);
+  else if ((info->connector_name_error == 0) && (info->connector_name != NULL))
+    {
+      char* name = malloc(3 * sizeof(size_t) + strlen(info->connector_name) + 2);
+      if (name != NULL)
+	sprintf(name, "%zu.%s", crtc->partition->partition, info->connector_name);
+      return name;
+    }
+  else
+    {
+      char* name = malloc(2 * 3 * sizeof(size_t) + 2);
+      if (name != NULL)
+	sprintf(name, "%zu.%zu", crtc->partition->partition, crtc->crtc);
+      return name;
+    }
+}
+

@@ -19,15 +19,16 @@
 #include "util.h"
 #include "server.h"
 #include "state.h"
+#include "kernel.h"
+#include "crtc-server/server.h"
+#include "gamma-server/server.h"
+#include "coopgamma-server/server.h"
 
 #include <sys/resource.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/un.h>
+#include <sys/wait.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <pwd.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,6 +51,16 @@
 #  define GCC_ONLY(...)  /* nothing */
 # endif
 #endif
+
+
+
+#define LIST_ADJUSTMENT_METHODS				\
+  X(LIBGAMMA_METHOD_DUMMY,                "dummy")	\
+  X(LIBGAMMA_METHOD_X_RANDR,              "randr")	\
+  X(LIBGAMMA_METHOD_X_VIDMODE,            "vidmode")	\
+  X(LIBGAMMA_METHOD_LINUX_DRM,            "drm")	\
+  X(LIBGAMMA_METHOD_W32_GDI,              "gdi")	\
+  X(LIBGAMMA_METHOD_QUARTZ_CORE_GRAPHICS, "quartz")
 
 
 
@@ -115,107 +126,6 @@ static void sig_connection(int signo)
 }
 
 
-/**
- * Get the pathname of the runtime file
- * 
- * @param   suffix  The suffix for the file
- * @return          The pathname of the file, `NULL` on error
- */
-GCC_ONLY(__attribute__((malloc, nonnull)))
-static char* get_pathname(const char* restrict suffix)
-{
-  const char* restrict rundir = getenv("XDG_RUNTIME_DIR");
-  const char* restrict username = "";
-  char* name = NULL;
-  char* p;
-  char* restrict rc;
-  struct passwd* restrict pw;
-  size_t n;
-  int saved_errno;
-  
-  if (site.site)
-    {
-      name = memdup(site.site, strlen(site.site) + 1);
-      if (name == NULL)
-	goto fail;
-    }
-  else if ((name = libgamma_method_default_site(site.method)))
-    {
-      name = memdup(name, strlen(name) + 1);
-      if (name == NULL)
-	goto fail;
-    }
-  
-  if (name != NULL)
-    switch (site.method)
-      {
-      case LIBGAMMA_METHOD_X_RANDR:
-      case LIBGAMMA_METHOD_X_VIDMODE:
-	if ((p = strrchr(name, ':')))
-	  if ((p = strchr(p, '.')))
-	    *p = '\0';
-	break;
-      default:
-	break;
-      }
-  
-  if (!rundir || !*rundir)
-    rundir = "/tmp";
-  
-  if ((pw = getpwuid(getuid())))
-    username = pw->pw_name ? pw->pw_name : "";
-  
-  n = sizeof("/.coopgammad/~/.") + 3 * sizeof(int);
-  n += strlen(rundir) + strlen(username) + strlen(name) + strlen(suffix);
-  if (!(rc = malloc(n)))
-    goto fail;
-  sprintf(rc, "%s/.coopgammad/~%s/%i%s%s%s",
-	  rundir, username, site.method, name ? "." : "", name ? name : "", suffix);
-  return rc;
-  
- fail:
-  saved_errno = errno;
-  free(name);
-  errno = saved_errno;
-  return NULL;
-}
-
-
-/**
- * Get the pathname of the socket
- * 
- * @return  The pathname of the socket, `NULL` on error
- */
-GCC_ONLY(__attribute__((malloc)))
-static inline char* get_socket_pathname(void)
-{
-  return get_pathname(".socket");
-}
-
-
-/**
- * Get the pathname of the PID file
- * 
- * @return  The pathname of the PID file, `NULL` on error
- */
-GCC_ONLY(__attribute__((malloc)))
-static inline char* get_pidfile_pathname(void)
-{
-  return get_pathname(".pid");
-}
-
-
-/**
- * Get the pathname of the state file
- * 
- * @return  The pathname of the state file, `NULL` on error
- */
-GCC_ONLY(__attribute__((malloc)))
-static inline char* get_state_pathname(void)
-{
-  return get_pathname(".state");
-}
-
 
 /**
  * Parse adjustment method name (or stringised number)
@@ -232,12 +142,9 @@ static int get_method(const char* restrict arg)
   
   const char* restrict p;
   
-  if (!strcmp(arg, "dummy"))    return LIBGAMMA_METHOD_DUMMY;
-  if (!strcmp(arg, "randr"))    return LIBGAMMA_METHOD_X_RANDR;
-  if (!strcmp(arg, "vidmode"))  return LIBGAMMA_METHOD_X_VIDMODE;
-  if (!strcmp(arg, "drm"))      return LIBGAMMA_METHOD_LINUX_DRM;
-  if (!strcmp(arg, "gdi"))      return LIBGAMMA_METHOD_W32_GDI;
-  if (!strcmp(arg, "quartz"))   return LIBGAMMA_METHOD_QUARTZ_CORE_GRAPHICS;
+#define X(C, N)  if (!strcmp(arg, N))  return C;
+  LIST_ADJUSTMENT_METHODS;
+#undef X
   
   if (!*arg || (/* avoid overflow: */ strlen(arg) > 4))
     goto bad;
@@ -255,203 +162,96 @@ static int get_method(const char* restrict arg)
 
 
 /**
- * Get the name of a CRTC
+ * Fork the process to the background
  * 
- * @param   info  Information about the CRTC
- * @param   crtc  libgamma's state for the CRTC
- * @return        The name of the CRTC, `NULL` on error
+ * @param   keep_stderr  Keep stderr open?
+ * @return               1: Success
+ *                       2: Failure
+ *                       4: The service is already running
+ *                       Otherwise: The negative of the exit value the
+ *                       process should have and shall exit immediately
  */
-GCC_ONLY(__attribute__((nonnull)))
-static char* get_crtc_name(const libgamma_crtc_information_t* restrict info,
-			   const libgamma_crtc_state_t* restrict crtc)
+static int daemonise(int keep_stderr)
 {
-  if ((info->edid_error == 0) && (info->edid != NULL))
-    return libgamma_behex_edid(info->edid, info->edid_length);
-  else if ((info->connector_name_error == 0) && (info->connector_name != NULL))
-    {
-      char* name = malloc(3 * sizeof(size_t) + strlen(info->connector_name) + 2);
-      if (name != NULL)
-	sprintf(name, "%zu.%s", crtc->partition->partition, info->connector_name);
-      return name;
-    }
-  else
-    {
-      char* name = malloc(2 * 3 * sizeof(size_t) + 2);
-      if (name != NULL)
-	sprintf(name, "%zu.%zu", crtc->partition->partition, crtc->crtc);
-      return name;
-    }
-}
-
-
-/**
- * Check whether a PID file is outdated
- * 
- * @param   pidfile  The PID file
- * @param   token    An environment variable (including both key and value)
- *                   that must exist in the process if it is a coopgammad process
- * @return           -1: An error occurred
- *                    0: The service is already running
- *                    1: The PID file is outdated
- */
-GCC_ONLY(__attribute__((nonnull)))
-static int is_pidfile_reusable(const char* restrict pidfile, const char* restrict token)
-{
-  /* PORTERS: /proc/$PID/environ is Linux specific */
+  pid_t pid;
+  int fd = -1, saved_errno;
+  int notify_rw[2] = { -1, -1 };
+  char a_byte = 0;
+  ssize_t got;
   
-  char temp[sizeof("/proc//environ") + 3 * sizeof(pid_t)];
-  int fd = -1, saved_errno, tries = 0;
-  char* content = NULL;
-  char* p;
-  pid_t pid = 0;
-  size_t n;
-#if defined(HAVE_LINUX_PROCFS)
-  char* end;
-#else
-  (void) token;
-#endif
-  
-  /* Get PID */
- retry:
-  fd = open(pidfile, O_RDONLY);
-  if (fd < 0)
-    return -1;
-  content = nread(fd, &n);
-  if (content == NULL)
+  if (pipe(notify_rw) < 0)
     goto fail;
-  close(fd), fd = -1;
+  if (notify_rw[0] <= STDERR_FILENO)
+    if ((notify_rw[0] = dup2atleast(notify_rw[0], STDERR_FILENO + 1)) < 0)
+      goto fail;
+  if (notify_rw[1] <= STDERR_FILENO)
+    if ((notify_rw[1] = dup2atleast(notify_rw[1], STDERR_FILENO + 1)) < 0)
+      goto fail;
   
-  if (n == 0)
+  switch ((pid = fork()))
     {
-      if (++tries > 1)
-	goto bad;
-      msleep(100); /* 1 tenth of a second */
-      goto retry;
-    }
-  
-  if (('0' > content[0]) || (content[0] > '9'))
-    goto bad;
-  if ((content[0] == '0') && ('0' <= content[1]) && (content[1] <= '9'))
-    goto bad;
-  for (p = content; *p; p++)
-    if (('0' <= *p) && (*p <= '9'))
-      pid = pid * 10 + (*p & 15);
-    else
+    case -1:
+      goto fail;
+    case 0:
+      /* Child */
+      close(notify_rw[0]), notify_rw[0] = -1;
+      if (setsid() < 0)
+	goto fail;
+      switch (fork())
+	{
+	case -1:
+	  goto fail;
+	case 0:
+	  /* Replace std* with /dev/null */
+	  fd = open("/dev/null", O_RDWR);
+	  if (fd < 0)
+	    goto fail;
+#define xdup2(s, d)  do if (s != d) { close(d); if (dup2(s, d) < 0) goto fail; } while (0)
+	  xdup2(fd, STDIN_FILENO);
+	  xdup2(fd, STDOUT_FILENO);
+	  if (keep_stderr)
+	    xdup2(fd, STDERR_FILENO);
+	  if (fd > STDERR_FILENO)
+		close(fd);
+	  fd = -1;
+	  
+	  /* Update PID file */
+	  fd = open(pidpath, O_WRONLY);
+	  if (fd < 0)
+	    goto fail;
+	  if (dprintf(fd, "%llu\n", (unsigned long long)getpid()) < 0)
+	    goto fail;
+	  close(fd), fd = -1;
+	  
+	  /* Notify */
+	  if (write(notify_rw[1], &a_byte, 1) <= 0)
+	    goto fail;
+	  close(notify_rw[1]);
+	  break;
+	default:
+	  /* Parent */
+	  return 0;
+	}
       break;
-  if (*p++ != '\n')
-    goto bad;
-  if (*p)
-    goto bad;
-  if ((size_t)(content - p) != n)
-    goto bad;
-  sprintf(temp, "%llu", (unsigned long long)pid);
-  if (strcmp(content, temp))
-    goto bad;
-  
-  /* Validate PID */
-#if defined(HAVE_LINUX_PROCFS)
-  sprintf(temp, "/proc/%llu/environ", (unsigned long long)pid);
-  fd = open(temp, O_RDONLY);
-  if (fd < 0)
-    return ((errno == ENOENT) || (errno == EACCES)) ? 1 : -1;
-  content = nread(fd, &n);
-  if (content == NULL)
-    goto fail;
-  close(fd), fd = -1;
-  
-  for (end = (p = content) + n; p != end; p = strchr(p, '\0') + 1)
-    if (!strcmp(p, token))
-      return 0;
-#else
-  if ((kill(pid, 0) == 0) || (errno == EINVAL))
-    return 0;
-#endif
+    default:
+      /* Parent */
+      waitpid(pid, NULL, 0);
+      close(notify_rw[1]), notify_rw[1] = -1;
+      got = read(notify_rw[0], &a_byte, 1);
+      if (got < 0)
+	goto fail;
+      close(notify_rw[0]);
+      return -(got == 0);
+    }
   
   return 1;
- bad:
-  fprintf(stderr, "%s: pid file contain invalid content: %s\n", argv0, pidfile);
-  errno = 0;
-  return -1;
  fail:
   saved_errno = errno;
-  free(content);
-  if (fd >= 0)
-    close(fd);
+  if (fd >= 0)            close(fd);
+  if (notify_rw[0] >= 0)  close(notify_rw[0]);
+  if (notify_rw[1] >= 0)  close(notify_rw[1]);
   errno = saved_errno;
-  return -1;
-}
-
-
-/**
- * Create PID file
- * 
- * @param   pidfile  The pathname of the PID file
- * @return           Zero on success, -1 on error,
- *                   -2 if the service is already running
- */
-GCC_ONLY(__attribute__((nonnull)))
-static int create_pidfile(char* pidfile)
-{
-  int fd, r, saved_errno;
-  char* p;
-  char* restrict token;
-  
-  /* Create token used to validate the service. */
-  token = malloc(sizeof("COOPGAMMAD_PIDFILE_TOKEN=") + strlen(pidfile));
-  if (token == NULL)
-    return -1;
-  sprintf(token, "COOPGAMMAD_PIDFILE_TOKEN=%s", pidfile);
-  if (putenv(token))
-    return -1;
-  
-  /* Create PID file's directory. */
-  for (p = pidfile; *p == '/'; p++);
-  while ((p = strchr(p, '/')))
-    {
-      *p = '\0';
-      if (mkdir(pidfile, 0644) < 0)
-	if (errno != EEXIST)
-	  return -1;
-      *p++ = '/';
-    }
-  
-  /* Create PID file. */
- retry:
-  fd = open(pidfile, O_CREAT | O_EXCL, 0644);
-  if (fd < 0)
-    {
-      if (errno == EINTR)
-	goto retry;
-      if (errno != EEXIST)
-	return -1;
-      r = is_pidfile_reusable(pidfile, token);
-      if (r > 0)
-	{
-	  unlink(pidfile);
-	  goto retry;
-	}
-      else if (r < 0)
-	goto fail;
-      fprintf(stderr, "%s: service is already running\n", argv0);
-      errno = 0;
-      return -2;
-    }
-  
-  /* Write PID to PID file. */
-  if (dprintf(fd, "%llu\n", (unsigned long long)getpid()) < 0)
-    goto fail;
-  
-  /* Done */
-  if (close(fd) < 0)
-    if (errno != EINTR)
-      return -1;
-  return 0;
- fail:
-  saved_errno = errno;
-  close(fd);
-  unlink(pidfile);
-  errno = saved_errno;
-  return -1;
+  return 1;
 }
 
 
@@ -473,7 +273,6 @@ static int create_pidfile(char* pidfile)
  */
 static int initialise(int full, int preserve, int foreground, int keep_stderr, int query)
 {
-  struct sockaddr_un address;
   struct rlimit rlimit;
   size_t i, j, n, n0;
   sigset_t mask;
@@ -560,131 +359,25 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
   if (outputs_n)
     if (!(outputs = calloc(outputs_n, sizeof(*outputs))))
       goto fail;
-  for (i = 0; i < outputs_n; i++)
-    {
-      libgamma_crtc_information_t info;
-      int saved_errno;
-      libgamma_get_crtc_information(&info, crtcs + i,
-				    LIBGAMMA_CRTC_INFO_EDID |
-				    LIBGAMMA_CRTC_INFO_MACRO_RAMP |
-				    LIBGAMMA_CRTC_INFO_GAMMA_SUPPORT |
-				    LIBGAMMA_CRTC_INFO_CONNECTOR_NAME);
-      outputs[i].depth       = info.gamma_depth_error   ? 0 : info.gamma_depth;
-      outputs[i].red_size    = info.gamma_size_error    ? 0 : info.red_gamma_size;
-      outputs[i].green_size  = info.gamma_size_error    ? 0 : info.green_gamma_size;
-      outputs[i].blue_size   = info.gamma_size_error    ? 0 : info.blue_gamma_size;
-      outputs[i].supported   = info.gamma_support_error ? 0 : info.gamma_support;
-      if (outputs[i].depth      == 0 || outputs[i].red_size  == 0 ||
-	  outputs[i].green_size == 0 || outputs[i].blue_size == 0)
-	outputs[i].supported = 0;
-      outputs[i].name        = get_crtc_name(&info, crtcs + i);
-      saved_errno = errno;
-      outputs[i].crtc        = crtcs + i;
-      libgamma_crtc_information_destroy(&info);
-      outputs[i].ramps_size = outputs[i].red_size + outputs[i].green_size + outputs[i].blue_size;
-      /* outputs[i].ramps_size will be multipled by the stop-size later */
-      errno = saved_errno;
-      if (outputs[i].name == NULL)
-	goto fail;
-    }
+  if (initialise_gamma_info() < 0)
+    goto fail;
   free(crtcs), crtcs = NULL;
   
   /* Sort outputs */
   qsort(outputs, outputs_n, sizeof(*outputs), output_cmp_by_name);
   
   /* Load current gamma ramps */
-#define LOAD_RAMPS(SUFFIX, MEMBER) \
-  do \
-    { \
-      libgamma_gamma_ramps##SUFFIX##_initialise(&(outputs[i].saved_ramps.MEMBER)); \
-      gerror = libgamma_crtc_get_gamma_ramps##SUFFIX(outputs[i].crtc, &(outputs[i].saved_ramps.MEMBER)); \
-      if (gerror) \
-	{ \
-	  libgamma_perror(argv0, gerror); \
-	  outputs[i].supported = LIBGAMMA_NO; \
-	  libgamma_gamma_ramps##SUFFIX##_destroy(&(outputs[i].saved_ramps.MEMBER)); \
-	  memset(&(outputs[i].saved_ramps.MEMBER), 0, sizeof(outputs[i].saved_ramps.MEMBER)); \
-	} \
-    } \
-  while (0)
-  for (i = 0; i < outputs_n; i++)
-    if (outputs[i].supported != LIBGAMMA_NO)
-      switch (outputs[i].depth)
-	{
-	case 8:
-	  outputs[i].ramps_size *= sizeof(uint8_t);
-	  LOAD_RAMPS(8, u8);
-	  break;
-	case 16:
-	  outputs[i].ramps_size *= sizeof(uint16_t);
-	  LOAD_RAMPS(16, u16);
-	  break;
-	case 32:
-	  outputs[i].ramps_size *= sizeof(uint32_t);
-	  LOAD_RAMPS(32, u32);
-	  break;
-	default:
-	  outputs[i].depth = 64;
-	  /* fall through */
-	case 64:
-	  outputs[i].ramps_size *= sizeof(uint64_t);
-	  LOAD_RAMPS(64, u64);
-	  break;
-	case -1:
-	  outputs[i].ramps_size *= sizeof(float);
-	  LOAD_RAMPS(f, f);
-	  break;
-	case -2:
-	  outputs[i].ramps_size *= sizeof(double);
-	  LOAD_RAMPS(d, d);
-	  break;
-	}
+  store_gamma();
   
   /* Preserve current gamma ramps at priority=0 if -p */
   if (preserve)
-    for (i = 0; i < outputs_n; i++)
-      {
-	struct filter filter = {
-	  .client   = -1,
-	  .priority = 0,
-	  .class    = NULL,
-	  .lifespan = LIFESPAN_UNTIL_REMOVAL,
-	  .ramps    = NULL
-	};
-	outputs[i].table_filters = calloc(4, sizeof(*(outputs[i].table_filters)));
-	outputs[i].table_sums = calloc(4, sizeof(*(outputs[i].table_sums)));
-	outputs[i].table_alloc = 4;
-	outputs[i].table_size = 1;
-	filter.class = memdup(PKGNAME "::" COMMAND "::preserved", sizeof(PKGNAME "::" COMMAND "::preserved"));
-	if (filter.class == NULL)
-	  goto fail;
-	filter.ramps = memdup(outputs[i].saved_ramps.u8.red, outputs[i].ramps_size);
-	if (filter.ramps == NULL)
-	  goto fail;
-	outputs[i].table_filters[0] = filter;
-	COPY_RAMP_SIZES(&(outputs[i].table_sums[0].u8), outputs + i);
-	if (!gamma_ramps_unmarshal(outputs[i].table_sums, outputs[i].saved_ramps.u8.red, outputs[i].ramps_size))
-	  goto fail;
-      }
+    if (preserve_gamma() < 0)
+      goto fail;
   
   if (full)
     {
       /* Create socket and start listening */
-      address.sun_family = AF_UNIX;
-      if (strlen(socketpath) >= sizeof(address.sun_path))
-	{
-	  errno = ENAMETOOLONG;
-	  goto fail;
-	}
-      strcpy(address.sun_path, socketpath);
-      unlink(socketpath);
-      if ((socketfd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
-	goto fail;
-      if (fchmod(socketfd, S_IRWXU) < 0)
-	goto fail;
-      if (bind(socketfd, (struct sockaddr*)(&address), (socklen_t)sizeof(address)) < 0)
-	goto fail;
-      if (listen(socketfd, SOMAXCONN) < 0)
+      if (create_socket(socketpath) < 0)
 	goto fail;
       
       /* Get the real pathname of the process's binary, in case
@@ -699,96 +392,18 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
     }
   
   /* Set up signal handlers */
-  if (signal(SIGUSR1, sig_reexec) == SIG_ERR)
-    goto fail;
-  if (signal(SIGTERM, sig_terminate) == SIG_ERR)
-    goto fail;
-  if (signal(SIGRTMIN + 0, sig_connection) == SIG_ERR)
-    goto fail;
-  if (signal(SIGRTMIN + 1, sig_connection) == SIG_ERR)
+  if ((signal(SIGUSR1,      sig_reexec)     == SIG_ERR) ||
+      (signal(SIGTERM,      sig_terminate)  == SIG_ERR) ||
+      (signal(SIGRTMIN + 0, sig_connection) == SIG_ERR) ||
+      (signal(SIGRTMIN + 1, sig_connection) == SIG_ERR))
     goto fail;
   
   /* Place in the background unless -f */
   if (full && (foreground == 0))
     {
-      pid_t pid;
-      int fd = -1, saved_errno;
-      int notify_rw[2] = { -1, -1 };
-      char a_byte = 0;
-      ssize_t got;
-      
-      if (pipe(notify_rw) < 0)
-	goto fail;
-      if (notify_rw[0] <= STDERR_FILENO)
-	if ((notify_rw[0] = dup2atleast(notify_rw[0], STDERR_FILENO + 1)) < 0)
-	  goto fail_background;
-      if (notify_rw[1] <= STDERR_FILENO)
-	if ((notify_rw[1] = dup2atleast(notify_rw[1], STDERR_FILENO + 1)) < 0)
-	  goto fail_background;
-      
-      switch ((pid = fork()))
-	{
-	case -1:
-	  goto fail_background;
-	case 0:
-	  /* Child */
-	  close(notify_rw[0]), notify_rw[0] = -1;
-	  if (setsid() < 0)
-	    goto fail_background;
-	  switch ((pid = fork()))
-	    {
-	    case -1:
-	      goto fail_background;
-	    case 0:
-	      /* Replace std* with /dev/null */
-	      fd = open("/dev/null", O_RDWR);
-	      if (fd < 0)
-		goto fail;
-#define xdup2(s, d)  do if (s != d) { close(d); if (dup2(s, d) < 0) goto fail; } while (0)
-	      xdup2(fd, STDIN_FILENO);
-	      xdup2(fd, STDOUT_FILENO);
-	      if (keep_stderr)
-		xdup2(fd, STDERR_FILENO);
-	      if (fd > STDERR_FILENO)
-		close(fd);
-	      fd = -1;
-	      
-	      /* Update PID file */
-	      fd = open(pidpath, O_WRONLY);
-	      if (fd < 0)
-		goto fail_background;
-	      if (dprintf(fd, "%llu\n", (unsigned long long)getpid()) < 0)
-		goto fail_background;
-	      close(fd), fd = -1;
-	      
-	      /* Notify */
-	      if (write(notify_rw[1], &a_byte, 1) <= 0)
-		goto fail_background;
-	      close(notify_rw[1]);
-	      break;
-	    default:
-	      /* Parent */
-	      return 0;
-	    }
-	  break;
-	default:
-	  /* Parent */
-	  close(notify_rw[1]), notify_rw[1] = -1;
-	  got = read(notify_rw[0], &a_byte, 1);
-	  if (got < 0)
-	    goto fail_background;
-	  close(notify_rw[0]);
-	  return -(got == 0);
-	}
-      
-      goto done_background;
-    fail_background:
-      saved_errno = errno;
-      if (fd >= 0)            close(fd);
-      if (notify_rw[0] >= 0)  close(notify_rw[0]);
-      if (notify_rw[1] >= 0)  close(notify_rw[1]);
-      errno = saved_errno;
-    done_background:;
+      r = daemonise(keep_stderr);
+      if (r != 1)
+	return r;
     }
   else if (full)
     {
@@ -818,53 +433,14 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
  */
 static void destroy(int full)
 {
-  size_t i;
-  
   if (full)
     disconnect_all();
   
-  if (full && (socketfd >= 0))
-    {
-      shutdown(socketfd, SHUT_RDWR);
-      close(socketfd);
-      unlink(socketpath);
-    }
+  if (full)
+    close_socket(socketpath);
   
-#define RESTORE_RAMPS(SUFFIX, MEMBER) \
-  do \
-    if (outputs[i].saved_ramps.MEMBER.red != NULL) \
-      { \
-	gerror = libgamma_crtc_set_gamma_ramps##SUFFIX(outputs[i].crtc, outputs[i].saved_ramps.MEMBER); \
-	if (gerror) \
-	    libgamma_perror(argv0, gerror); \
-      } \
-  while (0)
-  if (outputs != NULL)
-    for (i = 0; i < outputs_n; i++)
-      if (full && (outputs[i].supported != LIBGAMMA_NO))
-	switch (outputs[i].depth)
-	  {
-	  case 8:
-	    RESTORE_RAMPS(8, u8);
-	    break;
-	  case 16:
-	    RESTORE_RAMPS(16, u16);
-	    break;
-	  case 32:
-	    RESTORE_RAMPS(32, u32);
-	    break;
-	  case 64:
-	    RESTORE_RAMPS(64, u64);
-	    break;
-	  case -1:
-	    RESTORE_RAMPS(f, f);
-	    break;
-	  case -2:
-	    RESTORE_RAMPS(d, d);
-	    break;
-	  default:
-	    break; /* impossible */
-	  }
+  if (full && (outputs != NULL))
+    restore_gamma();
   
   free(socketpath);
   if (full && (pidpath != NULL))
@@ -1068,12 +644,9 @@ static int print_method_and_site(int query)
     {
       switch (method)
 	{
-	case LIBGAMMA_METHOD_DUMMY:                 methodname = "dummy";    break;
-	case LIBGAMMA_METHOD_X_RANDR:               methodname = "randr";    break;
-	case LIBGAMMA_METHOD_X_VIDMODE:             methodname = "vidmode";  break;
-	case LIBGAMMA_METHOD_LINUX_DRM:             methodname = "drm";      break;
-	case LIBGAMMA_METHOD_W32_GDI:               methodname = "gdi";      break;
-	case LIBGAMMA_METHOD_QUARTZ_CORE_GRAPHICS:  methodname = "quartz";   break;
+#define X(C, N)  case C: methodname = N; break;
+	LIST_ADJUSTMENT_METHODS;
+#undef X
 	default:
 	  if (printf("%i\n", method) < 0)
 	    return -1;
@@ -1085,15 +658,9 @@ static int print_method_and_site(int query)
     }
   
   if (sitename == NULL)
-    {
-      sitename = libgamma_method_default_site(method);
-      if (sitename != NULL)
-	{
-	  sitename = memdup(sitename, strlen(sitename) + 1);
-	  if (sitename == NULL)
-	    return -1;
-	}
-    }
+    if ((sitename = libgamma_method_default_site(method)))
+      if (!(sitename = memdup(sitename, strlen(sitename) + 1)))
+	return -1;
   
   if (sitename != NULL)
     switch (method)
