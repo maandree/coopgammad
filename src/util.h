@@ -99,7 +99,7 @@ void msleep(unsigned ms);
  * @return                      Zero if good, -1 on encoding error
  */
 GCC_ONLY(__attribute__((pure, nonnull)))
-int verify_utf8(const char* restrict string, int allow_modified_nul);
+int verify_utf8(const char* restrict string);
 
 /**
  * Make identity mapping ramps

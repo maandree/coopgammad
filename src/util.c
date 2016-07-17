@@ -195,11 +195,10 @@ void msleep(unsigned ms)
 /**
  * Check whether a NUL-terminated string is encoded in UTF-8
  * 
- * @param   string              The string
- * @param   allow_modified_nul  Whether Modified UTF-8 is allowed, which allows a two-byte encoding for NUL
- * @return                      Zero if good, -1 on encoding error
+ * @param   string  The string
+ * @return          Zero if good, -1 on encoding error
  */
-int verify_utf8(const char* restrict string, int allow_modified_nul)
+int verify_utf8(const char* restrict string)
 {
   static long BYTES_TO_MIN_BITS[] = {0, 0,  8, 12, 17, 22, 37};
   static long BYTES_TO_MAX_BITS[] = {0, 7, 11, 16, 21, 26, 31};
@@ -256,7 +255,6 @@ int verify_utf8(const char* restrict string, int allow_modified_nul)
 	/* Check that the character is not unnecessarily long. */
 	while (character)
 	    character >>= 1, bits++;
-	bits = ((bits == 0) && (bytes == 2) && allow_modified_nul) ? 8 : bits;
 	if ((bits < BYTES_TO_MIN_BITS[bytes]) || (BYTES_TO_MAX_BITS[bytes] < bits))
 	    return -1;
 	
