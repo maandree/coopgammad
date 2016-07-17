@@ -19,7 +19,7 @@
 #define UTIL_H
 
 
-#include <stddef.h>
+#include "types/output.h"
 
 
 
@@ -100,6 +100,16 @@ void msleep(int ms);
  */
 GCC_ONLY(__attribute__((pure, nonnull)))
 int verify_utf8(const char* restrict string, int allow_modified_nul);
+
+/**
+ * Make identity mapping ramps
+ * 
+ * @param   ramps   Output parameter for the ramps
+ * @param   output  The output for which the ramps shall be configured
+ * @return          Zero on success, -1 on error
+ */
+GCC_ONLY(__attribute__((nonnull)))
+int make_plain_ramps(union gamma_ramps* restrict ramps, struct output* restrict output);
 
 
 #endif

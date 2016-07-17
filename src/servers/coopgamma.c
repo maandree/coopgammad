@@ -208,56 +208,6 @@ static ssize_t add_filter(struct output* restrict out, struct filter* restrict f
 
 
 /**
- * Make identity mapping ramps
- * 
- * @param   ramps   Output parameter for the ramps
- * @param   output  The output for which the ramps shall be configured
- * @return          Zero on success, -1 on error
- */
-static int make_plain_ramps(union gamma_ramps* restrict ramps, struct output* restrict output)
-{
-  COPY_RAMP_SIZES(&(ramps->u8), output);
-  switch (output->depth)
-    {
-    case 8:
-      if (libgamma_gamma_ramps8_initialise(&(ramps->u8)))
-	return -1;
-      libclut_start_over(&(ramps->u8), UINT8_MAX, uint8_t, 1, 1, 1);
-      break;
-    case 16:
-      if (libgamma_gamma_ramps16_initialise(&(ramps->u16)))
-	return -1;
-      libclut_start_over(&(ramps->u16), UINT16_MAX, uint16_t, 1, 1, 1);
-      break;
-    case 32:
-      if (libgamma_gamma_ramps32_initialise(&(ramps->u32)))
-	return -1;
-      libclut_start_over(&(ramps->u32), UINT32_MAX, uint32_t, 1, 1, 1);
-      break;
-    case 64:
-      if (libgamma_gamma_ramps64_initialise(&(ramps->u64)))
-	return -1;
-      libclut_start_over(&(ramps->u64), UINT64_MAX, uint64_t, 1, 1, 1);
-      break;
-    case -1:
-      if (libgamma_gamma_rampsf_initialise(&(ramps->f)))
-	return -1;
-      libclut_start_over(&(ramps->f), 1.0f, float, 1, 1, 1);
-      break;
-    case -2:
-      if (libgamma_gamma_rampsd_initialise(&(ramps->d)))
-	return -1;
-      libclut_start_over(&(ramps->d), (double)1, double, 1, 1, 1);
-      break;
-    default:
-      abort();
-    }
-  return 0;
-}
-
-
-
-/**
  * Handle a closed connection
  * 
  * @param   client  The file descriptor for the client

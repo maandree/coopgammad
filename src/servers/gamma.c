@@ -19,6 +19,7 @@
 #include "crtc.h"
 #include "../state.h"
 #include "../communication.h"
+#include "../util.h"
 
 #include <errno.h>
 #include <string.h>
@@ -270,8 +271,25 @@ int disconnect(void)
  */
 int reconnect(void)
 {
+  union gamma_ramps plain;
+  size_t i;
+  
   if (connected)
     return 0;
+  
+  /* Reapply gamma ramps */
+  for (i = 0; i < outputs_n; i++)
+    {
+      struct output* output = outputs + i;
+      if (output->table_size > 0)
+	set_gamma(output, output->table_sums + output->table_size - 1);
+      else
+	{
+	  make_plain_ramps(&plain, output);
+	  set_gamma(output, &plain);
+	  libgamma_gamma_ramps8_destroy(&(plain.u8));
+	}
+    }
   
   connected = 1;
   return 0; /* TODO reconnect() */
