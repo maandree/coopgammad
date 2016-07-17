@@ -730,7 +730,7 @@ static char* reexecute(int preserve)
   
   destroy(0);
   
-  execlp(argv0_real ? argv0_real : argv0, argv0, "-#", statefile, preserve ? "-p" : NULL, NULL);
+  execlp(argv0_real ? argv0_real : argv0, argv0, "- ", statefile, preserve ? "-p" : NULL, NULL);
   saved_errno = errno;
   free(argv0_real), argv0_real = NULL;
   errno = saved_errno;
@@ -831,7 +831,7 @@ int main(int argc, char** argv)
     case 'f':  foreground  = 1;      break;
     case 'k':  keep_stderr = 1;      break;
     case 'q':  query = 1 + !!query;  break;
-    case '#': /* Internal, do not document */
+    case ' ': /* Internal, do not document */
       statefile = EARGF(usage());
       break;
     default:
