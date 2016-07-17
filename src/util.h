@@ -89,7 +89,7 @@ int dup2atleast(int fd, int atleast);
  * @param  ms  The number of milliseconds to sleep,
  *             must be less than 1000
  */
-void msleep(int ms);
+void msleep(unsigned ms);
 
 /**
  * Check whether a NUL-terminated string is encoded in UTF-8

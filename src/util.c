@@ -182,7 +182,7 @@ int dup2atleast(int fd, int atleast)
  * @param  ms  The number of milliseconds to sleep,
  *             must be less than 1000
  */
-void msleep(int ms)
+void msleep(unsigned ms)
 {
   struct timespec ts;
   ts.tv_sec = 0;
