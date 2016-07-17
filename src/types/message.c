@@ -332,7 +332,7 @@ static int validate_header(const char* restrict header, size_t length)
 {
   char* restrict p = memchr(header, ':', length * sizeof(char));
   
-  if (verify_utf8(header, 0) < 0)
+  if (verify_utf8(header) < 0)
     /* Either the string is not UTF-8, or your are under an UTF-8 attack,
        let's just call this unrecoverable because the client will not correct. */
     return -2;
