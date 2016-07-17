@@ -54,6 +54,12 @@
 
 
 
+/**
+ * Lists all function recognised adjustment methods,
+ * will call macro X with the code for the each
+ * adjustment method as the first argument and
+ * corresponding name as the second argument
+ */
 #define LIST_ADJUSTMENT_METHODS				\
   X(LIBGAMMA_METHOD_DUMMY,                "dummy")	\
   X(LIBGAMMA_METHOD_X_RANDR,              "randr")	\
@@ -64,26 +70,42 @@
 
 
 
-extern char* restrict pidpath;
-extern char* restrict socketpath;
-extern int gerror;
+/**
+ * Used by initialisation functions as their return type. If a
+ * value not listed here is returned by such function, it is the
+ * exit value the process shall exit with as soon as possible.
+ */
+enum init_status
+{
+  /**
+   * Initialisation was successful
+   */
+  INIT_SUCCESS = -1,
+  
+  /**
+   * Initialisation failed
+   */
+  INIT_FAILURE = -2,
+  
+  /**
+   * Server is already running
+   */
+  INIT_RUNNING = -3,
+};
 
 
 
 /**
  * The pathname of the PID file
  */
+extern char* restrict pidpath;
 char* restrict pidpath = NULL;
 
 /**
  * The pathname of the socket
  */
+extern char* restrict socketpath;
 char* restrict socketpath = NULL;
-
-/**
- * Error code returned by libgamma
- */
-int gerror; /* do not marshal */
 
 
 
@@ -165,13 +187,9 @@ static int get_method(const char* restrict arg)
  * Fork the process to the background
  * 
  * @param   keep_stderr  Keep stderr open?
- * @return               1: Success
- *                       2: Failure
- *                       4: The service is already running
- *                       Otherwise: The negative of the exit value the
- *                       process should have and shall exit immediately
+ * @return               An `enum init_status` value or an exit value
  */
-static int daemonise(int keep_stderr)
+static enum init_status daemonise(int keep_stderr)
 {
   pid_t pid;
   int fd = -1, saved_errno;
@@ -188,70 +206,69 @@ static int daemonise(int keep_stderr)
     if ((notify_rw[1] = dup2atleast(notify_rw[1], STDERR_FILENO + 1)) < 0)
       goto fail;
   
-  switch ((pid = fork()))
+  if ((pid = fork()) < 0)
+    goto fail;
+  if (pid > 0)
     {
-    case -1:
-      goto fail;
-    case 0:
-      /* Child */
-      close(notify_rw[0]), notify_rw[0] = -1;
-      if (setsid() < 0)
-	goto fail;
-      switch (fork())
-	{
-	case -1:
-	  goto fail;
-	case 0:
-	  /* Replace std* with /dev/null */
-	  fd = open("/dev/null", O_RDWR);
-	  if (fd < 0)
-	    goto fail;
-#define xdup2(s, d)  do if (s != d) { close(d); if (dup2(s, d) < 0) goto fail; } while (0)
-	  xdup2(fd, STDIN_FILENO);
-	  xdup2(fd, STDOUT_FILENO);
-	  if (keep_stderr)
-	    xdup2(fd, STDERR_FILENO);
-	  if (fd > STDERR_FILENO)
-		close(fd);
-	  fd = -1;
-	  
-	  /* Update PID file */
-	  fd = open(pidpath, O_WRONLY);
-	  if (fd < 0)
-	    goto fail;
-	  if (dprintf(fd, "%llu\n", (unsigned long long)getpid()) < 0)
-	    goto fail;
-	  close(fd), fd = -1;
-	  
-	  /* Notify */
-	  if (write(notify_rw[1], &a_byte, 1) <= 0)
-	    goto fail;
-	  close(notify_rw[1]);
-	  break;
-	default:
-	  /* Parent */
-	  return 0;
-	}
-      break;
-    default:
-      /* Parent */
+      /* Original process (parent): */
       waitpid(pid, NULL, 0);
       close(notify_rw[1]), notify_rw[1] = -1;
       got = read(notify_rw[0], &a_byte, 1);
       if (got < 0)
 	goto fail;
       close(notify_rw[0]);
-      return -(got == 0);
+      errno = 0;
+      return got == 0 ? INIT_FAILURE : (enum init_status)0;
     }
   
-  return 1;
+  /* Intermediary process (child): */
+  close(notify_rw[0]), notify_rw[0] = -1;
+  if (setsid() < 0)
+    goto fail;
+  if ((pid = fork()) < 0)
+    goto fail;
+  if (pid > 0)
+    {
+      /* Intermediary process (parent): */
+      return (enum init_status)0;
+    }
+  
+  /* Daemon process (child): */
+  
+  /* Replace std* with /dev/null */
+  fd = open("/dev/null", O_RDWR);
+  if (fd < 0)
+    goto fail;
+#define xdup2(s, d)  do if (s != d) { close(d); if (dup2(s, d) < 0) goto fail; } while (0)
+  xdup2(fd, STDIN_FILENO);
+  xdup2(fd, STDOUT_FILENO);
+  if (keep_stderr)
+    xdup2(fd, STDERR_FILENO);
+  if (fd > STDERR_FILENO)
+    close(fd);
+  fd = -1;
+  
+  /* Update PID file */
+  fd = open(pidpath, O_WRONLY);
+  if (fd < 0)
+    goto fail;
+  if (dprintf(fd, "%llu\n", (unsigned long long)getpid()) < 0)
+    goto fail;
+  close(fd), fd = -1;
+  
+  /* Notify */
+  if (write(notify_rw[1], &a_byte, 1) <= 0)
+    goto fail;
+  close(notify_rw[1]);
+  
+  return INIT_SUCCESS;
  fail:
   saved_errno = errno;
   if (fd >= 0)            close(fd);
   if (notify_rw[0] >= 0)  close(notify_rw[0]);
   if (notify_rw[1] >= 0)  close(notify_rw[1]);
   errno = saved_errno;
-  return 1;
+  return INIT_FAILURE;
 }
 
 
@@ -264,20 +281,16 @@ static int daemonise(int keep_stderr)
  * @param   foreground   Keep process in the foreground
  * @param   keep_stderr  Keep stderr open
  * @param   query        Was -q used, see `main` for description
- * @return               1: Success
- *                       2: Normal failure
- *                       3: Libgamma failure
- *                       4: The service is already running
- *                       Otherwise: The negative of the exit value the
- *                       process should have and shall exit immediately
+ * @return               An `enum init_status` value or an exit value
  */
-static int initialise(int full, int preserve, int foreground, int keep_stderr, int query)
+static enum init_status initialise(int full, int preserve, int foreground, int keep_stderr, int query)
 {
   struct rlimit rlimit;
-  size_t i, j, n, n0;
+  size_t i, n;
   sigset_t mask;
   char* restrict sitename_dup = NULL;
-  int r;
+  int s, gerror;
+  enum init_status r;
   
   /* Zero out some memory so it can be destoried safely. */
   memset(&site, 0, sizeof(site));
@@ -294,8 +307,8 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
       
       /* Set umask, reset signal handlers, and reset signal mask */
       umask(0);
-      for (r = 1; r < _NSIG; r++)
-	signal(r, SIG_DFL);
+      for (s = 1; s < _NSIG; s++)
+	signal(s, SIG_DFL);
       if (sigfillset(&mask))
 	perror(argv0);
       else
@@ -308,21 +321,19 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
   
   /* Go no further if we are just interested in the adjustment method and site */
   if (query)
-    return 1;
+    return INIT_SUCCESS;
   
   /* Get site */
-  if (sitename != NULL)
-    if (!(sitename_dup = memdup(sitename, strlen(sitename) + 1)))
-      goto fail;
+  if ((sitename != NULL) && !(sitename_dup = memdup(sitename, strlen(sitename) + 1)))
+    goto fail;
   if ((gerror = libgamma_site_initialise(&site, method, sitename_dup)))
     goto fail_libgamma;
   
   if (full)
     {
       /* Get PID file and socket pathname */
-      if (!(pidpath = get_pidfile_pathname()))
-	goto fail;
-      if (!(socketpath = get_socket_pathname()))
+      if (!(pidpath   = get_pidfile_pathname()) ||
+	  !(socketpath = get_socket_pathname()))
 	goto fail;
       
       /* Create PID file */
@@ -330,35 +341,18 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
 	{
 	  free(pidpath), pidpath = NULL;
 	  if (r == -2)
-	    goto already_running;
+	    return INIT_RUNNING;
 	  goto fail;
 	}
     }
   
-  /* Get partitions */
-  if (site.partitions_available)
-    if (!(partitions = calloc(site.partitions_available, sizeof(*partitions))))
-      goto fail;
-  for (i = 0; i < site.partitions_available; i++)
-    {
-      if ((gerror = libgamma_partition_initialise(partitions + i, &site, i)))
-	goto fail_libgamma;
-      outputs_n += partitions[i].crtcs_available;
-    }
-  
-  /* Get CRTC:s */
-  if (outputs_n)
-    if (!(crtcs = calloc(outputs_n, sizeof(*crtcs))))
-      goto fail;
-  for (i = 0, j = n = 0; i < site.partitions_available; i++)
-    for (n0 = n, n += partitions[i].crtcs_available; j < n; j++)
-      if ((gerror = libgamma_crtc_initialise(crtcs + j, partitions + i, j - n0)))
-	goto fail_libgamma;
+  /* Get partitions and CRTC:s */
+  if (initialise_crtcs() < 0)
+    goto fail;
   
   /* Get CRTC information */
-  if (outputs_n)
-    if (!(outputs = calloc(outputs_n, sizeof(*outputs))))
-      goto fail;
+  if (outputs_n && !(outputs = calloc(outputs_n, sizeof(*outputs))))
+    goto fail;
   if (initialise_gamma_info() < 0)
     goto fail;
   free(crtcs), crtcs = NULL;
@@ -370,9 +364,8 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
   store_gamma();
   
   /* Preserve current gamma ramps at priority=0 if -p */
-  if (preserve)
-    if (preserve_gamma() < 0)
-      goto fail;
+  if (preserve && (preserve_gamma() < 0))
+    goto fail;
   
   if (full)
     {
@@ -382,9 +375,8 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
       
       /* Get the real pathname of the process's binary, in case
        * it is relative, so we can re-execute without problem. */
-      if ((*argv0 != '/') && strchr(argv0, '/'))
-	if (!(argv0_real = realpath(argv0, NULL)))
-	  goto fail;
+      if ((*argv0 != '/') && strchr(argv0, '/') && !(argv0_real = realpath(argv0, NULL)))
+	goto fail;
       
       /* Change directory to / to avoid blocking umounting */
       if (chdir("/") < 0)
@@ -400,11 +392,7 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
   
   /* Place in the background unless -f */
   if (full && (foreground == 0))
-    {
-      r = daemonise(keep_stderr);
-      if (r != 1)
-	return r;
-    }
+    return daemonise(keep_stderr);
   else if (full)
     {
       /* Signal the spawner that the service is ready */
@@ -415,13 +403,12 @@ static int initialise(int full, int preserve, int foreground, int keep_stderr, i
 	perror(argv0);
     }
   
-  return 1;
- fail:
-  return 2;
+  return INIT_SUCCESS;
  fail_libgamma:
-  return 3;
- already_running:
-  return 4;
+  libgamma_perror(argv0, gerror);
+  errno = 0;
+ fail:
+  return INIT_FAILURE;
 }
 
 
@@ -442,11 +429,11 @@ static void destroy(int full)
   if (full && (outputs != NULL))
     restore_gamma();
   
+  state_destroy();
   free(socketpath);
   if (full && (pidpath != NULL))
     unlink(pidpath);
   free(pidpath);
-  state_destroy();
 }
 
 
@@ -699,6 +686,69 @@ static int print_method_and_site(int query)
 
 
 /**
+ * Reexecute the server
+ * 
+ * Returns only on failure
+ * 
+ * @param   preserve  Did -p appear on the comment line?
+ * @return            Pathname of file where the state is stored,
+ *                    `NULL` if the state is in tact
+ */
+static char* reexecute(int preserve)
+{
+  char* statefile = NULL;
+  char* statebuffer = NULL;
+  size_t buffer_size;
+  int fd = -1, saved_errno;
+  
+  statefile = get_state_pathname();
+  if (statefile == NULL)
+    goto fail;
+  
+  buffer_size = marshal(NULL);
+  statebuffer = malloc(buffer_size);
+  if (statebuffer == NULL)
+    goto fail;
+  if (marshal(statebuffer) != buffer_size)
+    {
+      fprintf(stderr, "%s: internal error", argv0);
+      errno = 0;
+      goto fail;
+    }
+  
+  fd = open(statefile, O_CREAT, S_IRUSR | S_IWUSR);
+  if (fd < 0)
+    goto fail;
+  
+  if (nwrite(fd, statebuffer, buffer_size) != buffer_size)
+    goto fail;
+  free(statebuffer), statebuffer = NULL;
+  
+  if ((close(fd) < 0) && (fd = -1, errno != EINTR))
+    goto fail;
+  fd = -1;
+  
+  destroy(0);
+  
+  execlp(argv0_real ? argv0_real : argv0, argv0, "-#", statefile, preserve ? "-p" : NULL, NULL);
+  saved_errno = errno;
+  free(argv0_real), argv0_real = NULL;
+  errno = saved_errno;
+  return statefile;
+  
+ fail:
+  saved_errno = errno;
+  free(statebuffer);
+  if (fd >= 0)
+    close(fd);
+  if (statefile != NULL)
+    unlink(statefile), free(statefile);
+  errno = saved_errno;
+  return NULL;
+}
+
+
+/**
  * Print usage information and exit
  */
 #if defined(__GNU__) || defined(__clang__)
@@ -762,7 +812,6 @@ int main(int argc, char** argv)
 {
   int rc = 1, preserve = 0, foreground = 0, keep_stderr = 0, query = 0, r;
   char* statefile = NULL;
-  char* statebuffer = NULL;
   
   ARGBEGIN
     {
@@ -778,18 +827,10 @@ int main(int argc, char** argv)
       if (method < 0)
 	goto fail;
       break;
-    case 'p':
-      preserve = 1;
-      break;
-    case 'f':
-      foreground = 1;
-      break;
-    case 'k':
-      keep_stderr = 1;
-      break;
-    case 'q':
-      query = 1 + !!query;
-      break;
+    case 'p':  preserve    = 1;      break;
+    case 'f':  foreground  = 1;      break;
+    case 'k':  keep_stderr = 1;      break;
+    case 'q':  query = 1 + !!query;  break;
     case '#': /* Internal, do not document */
       statefile = EARGF(usage());
       break;
@@ -800,21 +841,14 @@ int main(int argc, char** argv)
   if (argc > 0)
     usage();
   
- restart: /* If C had comefrom: comefrom reexec_failure; */
+ restart:
   
   switch ((r = initialise(statefile == NULL, preserve, foreground, keep_stderr, query)))
     {
-    case 1:
-      break;
-    case 2:
-      goto fail;
-    case 3:
-      goto fail_libgamma;
-    case 4:
-      rc = 2;
-      goto fail;
-    default:
-      return -r;
+    case INIT_SUCCESS:  break;
+    case INIT_RUNNING:  rc = 2;  /* fall through */
+    case INIT_FAILURE:  goto fail;
+    default:            return r;
     }
   
   if (query)
@@ -828,60 +862,35 @@ int main(int argc, char** argv)
     {
       if (unmarshal_and_merge_state(statefile) < 0)
 	goto fail;
+      if (reexec)
+	free(statefile);
       unlink(statefile), statefile = NULL;
-      reexec = 0; /* See `if (reexec && !terminate)` */
+      reexec = 0; /* See `if (reexec && !terminate)` below */
     }
   
+ reenter_loop:
   if (main_loop() < 0)
     goto fail;
   
   if (reexec && !terminate)
     {
-      size_t buffer_size;
-      int fd;
-      
-      /* `reexec = 0;` is done later in case of re-execute failure,
-       * since it determines whether `statefile` shall be freed. */
-      
-      statefile = get_state_pathname();
-      if (statefile == NULL)
-	goto fail;
-      
-      buffer_size = marshal(NULL);
-      statebuffer = malloc(buffer_size);
-      if (statebuffer == NULL)
-	goto fail;
-      if (marshal(statebuffer) != buffer_size)
-	abort();
-      
-      fd = open(statefile, O_CREAT, S_IRUSR | S_IWUSR);
-      if (fd < 0)
-	goto fail;
-      
-      if (nwrite(fd, statebuffer, buffer_size) != buffer_size)
+      if ((statefile = reexecute(preserve)))
 	{
 	  perror(argv0);
-	  close(fd);
-	  errno = 0;
-	  goto fail;
+	  fprintf(stderr, "%s: restoring state without re-executing\n", argv0);
+	  /* `reexec = 0;` is done later in case of re-execute failure,
+	   * since it determines whether `statefile` shall be freed. */
+	  goto restart;
 	}
-      free(statebuffer), statebuffer = NULL;
-      
-      if ((close(fd) < 0) && (errno != EINTR))
-	goto fail;
-      
-      destroy(0);
-      
-      execlp(argv0_real ? argv0_real : argv0, argv0, "-#", statefile, preserve ? "-p" : NULL, NULL);
       perror(argv0);
-      fprintf(stderr, "%s: restoring state without re-executing\n", argv0);
-      free(argv0_real), argv0_real = NULL;
-      goto restart;
+      fprintf(stderr, "%s: continuing without re-executing\n", argv0);
+      reexec = 0;
+      goto reenter_loop;
     }
   
-  rc = 0;
  done:
-  free(statebuffer);
+  rc = 0;
+ deinit:
   if (statefile)
     unlink(statefile);
   if (reexec)
@@ -891,9 +900,6 @@ int main(int argc, char** argv)
  fail:
   if (errno != 0)
     perror(argv0);
-  goto done;
- fail_libgamma:
-  libgamma_perror(argv0, gerror);
-  goto done;
+  goto deinit;
 }
 

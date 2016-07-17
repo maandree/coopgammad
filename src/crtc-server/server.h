@@ -55,6 +55,13 @@ GCC_ONLY(__attribute__((nonnull)))
 char* get_crtc_name(const libgamma_crtc_information_t* restrict info,
 		    const libgamma_crtc_state_t* restrict crtc);
 
+/**
+ * Get partitions and CRTC:s
+ * 
+ * @return   Zero on success, -1 on error
+ */
+int initialise_crtcs(void);
+
 
 #endif
 

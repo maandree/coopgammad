@@ -19,6 +19,7 @@
 #include "../state.h"
 #include "../communication.h"
 
+#include <errno.h>
 #include <string.h>
 
 
@@ -84,5 +85,45 @@ char* get_crtc_name(const libgamma_crtc_information_t* restrict info,
 	sprintf(name, "%zu.%zu", crtc->partition->partition, crtc->crtc);
       return name;
     }
+}
+
+
+/**
+ * Get partitions and CRTC:s
+ * 
+ * @return   Zero on success, -1 on error
+ */
+int initialise_crtcs(void)
+{
+  size_t i, j, n, n0;
+  int gerror;
+  
+  /* Get partitions */
+  if (site.partitions_available)
+    if (!(partitions = calloc(site.partitions_available, sizeof(*partitions))))
+      goto fail;
+  for (i = 0; i < site.partitions_available; i++)
+    {
+      if ((gerror = libgamma_partition_initialise(partitions + i, &site, i)))
+	goto fail_libgamma;
+      outputs_n += partitions[i].crtcs_available;
+    }
+  
+  /* Get CRTC:s */
+  if (outputs_n)
+    if (!(crtcs = calloc(outputs_n, sizeof(*crtcs))))
+      goto fail;
+  for (i = 0, j = n = 0; i < site.partitions_available; i++)
+    for (n0 = n, n += partitions[i].crtcs_available; j < n; j++)
+      if ((gerror = libgamma_crtc_initialise(crtcs + j, partitions + i, j - n0)))
+	goto fail_libgamma;
+  
+  return 0;
+  
+ fail_libgamma:
+  libgamma_perror(argv0, gerror);
+  errno = 0;
+ fail:
+  return -1;
 }
 
