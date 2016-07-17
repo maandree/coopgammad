@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef CRTC_SERVER_SERVER_H
-#define CRTC_SERVER_SERVER_H
+#ifndef SERVERS_CRTC_H
+#define SERVERS_CRTC_H
 
 
 #include <libgamma.h>

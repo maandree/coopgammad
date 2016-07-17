@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef GAMMA_SERVER_SERVER_H
-#define GAMMA_SERVER_SERVER_H
+#ifndef SERVERS_GAMMA_H
+#define SERVERS_GAMMA_H
 
 
 #include "../types/output.h"

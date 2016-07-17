@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef KERNEL_H
-#define KERNEL_H
+#ifndef SERVERS_KERNEL_H
+#define SERVERS_KERNEL_H
 
 
 #ifndef GCC_ONLY

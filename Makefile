@@ -4,20 +4,19 @@ COMMAND = coopgammad
 KERNEL = $(shell uname | tr '[A-Z]_' '[a-z]-')
 
 SRC = \
-	coopgammad			\
-	server				\
-	util				\
-	communication			\
-	state				\
-	kernel				\
-	crtc-server/server		\
-	gamma-server/server		\
-	coopgamma-server/server		\
-	coopgamma-server/chaining	\
-	types/filter			\
-	types/output			\
-	types/ramps			\
-	types/message			\
+	coopgammad		\
+	server			\
+	util			\
+	communication		\
+	state			\
+	servers/kernel		\
+	servers/crtc		\
+	servers/gamma		\
+	servers/coopgamma	\
+	types/filter		\
+	types/output		\
+	types/ramps		\
+	types/message		\
 	types/ring
 
 OPTIMISE = -Og -g

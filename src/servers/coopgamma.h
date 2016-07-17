@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef COOPGAMMA_SERVER_SERVER_H
-#define COOPGAMMA_SERVER_SERVER_H
+#ifndef SERVERS_COOPGAMMA_H
+#define SERVERS_COOPGAMMA_H
 
 
 #include "../types/output.h"

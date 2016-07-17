@@ -19,9 +19,9 @@
 #include "util.h"
 #include "communication.h"
 #include "state.h"
-#include "crtc-server/server.h"
-#include "gamma-server/server.h"
-#include "coopgamma-server/server.h"
+#include "servers/crtc.h"
+#include "servers/gamma.h"
+#include "servers/coopgamma.h"
 
 #include <sys/select.h>
 #include <sys/socket.h>

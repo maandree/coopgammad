@@ -17,7 +17,7 @@
  */
 #include "communication.h"
 #include "state.h"
-#include "coopgamma-server/server.h"
+#include "servers/coopgamma.h"
 
 #include <sys/socket.h>
 #include <errno.h>
