@@ -15,13 +15,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "server.h"
-#include "util.h"
-#include "communication.h"
-#include "state.h"
-#include "servers/crtc.h"
-#include "servers/gamma.h"
-#include "servers/coopgamma.h"
+#include "master.h"
+#include "crtc.h"
+#include "gamma.h"
+#include "coopgamma.h"
+#include "../util.h"
+#include "../communication.h"
+#include "../state.h"
 
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -32,6 +32,83 @@
 #include <string.h>
 #include <unistd.h>
 
+
+
+/**
+ * Extract headers from an inbound message and pass
+ * them on to appropriate message handling function
+ * 
+ * @param   conn  The index of the connection
+ * @param   msg   The inbound message
+ * @return        1: The connection as closed
+ *                0: Successful
+ *                -1: Failure
+ */
+static int dispatch_message(size_t conn, struct message* restrict msg)
+{
+  size_t i;
+  int r = 0;
+  const char* header;
+  const char* value;
+  const char* command       = NULL;
+  const char* crtc          = NULL;
+  const char* coalesce      = NULL;
+  const char* high_priority = NULL;
+  const char* low_priority  = NULL;
+  const char* priority      = NULL;
+  const char* class         = NULL;
+  const char* lifespan      = NULL;
+  const char* message_id    = NULL;
+  
+  for (i = 0; i < msg->header_count; i++)
+    {
+      value = strstr((header = msg->headers[i]), ": ") + 2;
+      if      (strstr(header, "Command: ")       == header)  command       = value;
+      else if (strstr(header, "CRTC: ")          == header)  crtc          = value;
+      else if (strstr(header, "Coalesce: ")      == header)  coalesce      = value;
+      else if (strstr(header, "High priority: ") == header)  high_priority = value;
+      else if (strstr(header, "Low priority: ")  == header)  low_priority  = value;
+      else if (strstr(header, "Priority: ")      == header)  priority      = value;
+      else if (strstr(header, "Class: ")         == header)  class         = value;
+      else if (strstr(header, "Lifespan: ")      == header)  lifespan      = value;
+      else if (strstr(header, "Message ID: ")    == header)  message_id    = value;
+      else
+	fprintf(stderr, "%s: ignoring unrecognised header: %s\n", argv0, header);
+    }
+  
+  if (command == NULL)
+    fprintf(stderr, "%s: ignoring message without Command header\n", argv0);
+  else if (message_id == NULL)
+    fprintf(stderr, "%s: ignoring message without Message ID header\n", argv0);
+  else if (!strcmp(command, "enumerate-crtcs"))
+    {
+      if (crtc || coalesce || high_priority || low_priority || priority || class || lifespan)
+	fprintf(stderr, "%s: ignoring superfluous headers in Command: enumerate-crtcs message\n", argv0);
+      r = handle_enumerate_crtcs(conn, message_id);
+    }
+  else if (!strcmp(command, "get-gamma-info"))
+    {
+      if (coalesce || high_priority || low_priority || priority || class || lifespan)
+	fprintf(stderr, "%s: ignoring superfluous headers in Command: get-gamma-info message\n", argv0);
+      r = handle_get_gamma_info(conn, message_id, crtc);
+    }
+  else if (!strcmp(command, "get-gamma"))
+    {
+      if (priority || class || lifespan)
+	fprintf(stderr, "%s: ignoring superfluous headers in Command: get-gamma message\n", argv0);
+      r = handle_get_gamma(conn, message_id, crtc, coalesce, high_priority, low_priority);
+    }
+  else if (!strcmp(command, "set-gamma"))
+    {
+      if (coalesce || high_priority || low_priority)
+	fprintf(stderr, "%s: ignoring superfluous headers in Command: set-gamma message\n", argv0);
+      r = handle_set_gamma(conn, message_id, crtc, priority, class, lifespan);
+    }
+  else
+    fprintf(stderr, "%s: ignoring unrecognised command: Command: %s\n", argv0, command);
+  
+  return r;
+}
 
 
 /**
@@ -130,7 +207,6 @@ static int handle_server(void)
 }
 
 
-
 /**
  * Handle event on a connection to a client
  * 
@@ -143,16 +219,6 @@ static int handle_connection(size_t conn)
 {
   struct message* restrict msg = inbound + conn;
   int r, fd = connections[conn];
-  const char* command       = NULL;
-  const char* crtc          = NULL;
-  const char* coalesce      = NULL;
-  const char* high_priority = NULL;
-  const char* low_priority  = NULL;
-  const char* priority      = NULL;
-  const char* class         = NULL;
-  const char* lifespan      = NULL;
-  const char* message_id    = NULL;
-  size_t i;
   
  again:
   switch (message_read(msg, fd))
@@ -187,54 +253,7 @@ static int handle_connection(size_t conn)
       return 1;
     }
   
-  for (i = 0; i < msg->header_count; i++)
-    {
-      char* header = msg->headers[i];
-      if      (strstr(header, "Command: ")       == header)  command       = strstr(header, ": ") + 2;
-      else if (strstr(header, "CRTC: ")          == header)  crtc          = strstr(header, ": ") + 2;
-      else if (strstr(header, "Coalesce: ")      == header)  coalesce      = strstr(header, ": ") + 2;
-      else if (strstr(header, "High priority: ") == header)  high_priority = strstr(header, ": ") + 2;
-      else if (strstr(header, "Low priority: ")  == header)  low_priority  = strstr(header, ": ") + 2;
-      else if (strstr(header, "Priority: ")      == header)  priority      = strstr(header, ": ") + 2;
-      else if (strstr(header, "Class: ")         == header)  class         = strstr(header, ": ") + 2;
-      else if (strstr(header, "Lifespan: ")      == header)  lifespan      = strstr(header, ": ") + 2;
-      else if (strstr(header, "Message ID: ")    == header)  message_id    = strstr(header, ": ") + 2;
-      else
-	fprintf(stderr, "%s: ignoring unrecognised header: %s\n", argv0, header);
-    }
-  
-  r = 0;
-  if (command == NULL)
-    fprintf(stderr, "%s: ignoring message without Command header\n", argv0);
-  else if (message_id == NULL)
-    fprintf(stderr, "%s: ignoring message without Message ID header\n", argv0);
-  else if (!strcmp(command, "enumerate-crtcs"))
-    {
-      if (crtc || coalesce || high_priority || low_priority || priority || class || lifespan)
-	fprintf(stderr, "%s: ignoring superfluous headers in Command: enumerate-crtcs message\n", argv0);
-      r = handle_enumerate_crtcs(conn, message_id);
-    }
-  else if (!strcmp(command, "get-gamma-info"))
-    {
-      if (coalesce || high_priority || low_priority || priority || class || lifespan)
-	fprintf(stderr, "%s: ignoring superfluous headers in Command: get-gamma-info message\n", argv0);
-      r = handle_get_gamma_info(conn, message_id, crtc);
-    }
-  else if (!strcmp(command, "get-gamma"))
-    {
-      if (priority || class || lifespan)
-	fprintf(stderr, "%s: ignoring superfluous headers in Command: get-gamma message\n", argv0);
-      r = handle_get_gamma(conn, message_id, crtc, coalesce, high_priority, low_priority);
-    }
-  else if (!strcmp(command, "set-gamma"))
-    {
-      if (coalesce || high_priority || low_priority)
-	fprintf(stderr, "%s: ignoring superfluous headers in Command: set-gamma message\n", argv0);
-      r = handle_set_gamma(conn, message_id, crtc, priority, class, lifespan);
-    }
-  else
-    fprintf(stderr, "%s: ignoring unrecognised command: Command: %s\n", argv0, command);
-  if (r)
+  if ((r = dispatch_message(conn, msg)))
     return r;
   
   goto again;

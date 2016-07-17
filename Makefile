@@ -5,10 +5,10 @@ KERNEL = $(shell uname | tr '[A-Z]_' '[a-z]-')
 
 SRC = \
 	coopgammad		\
-	server			\
 	util			\
 	communication		\
 	state			\
+	servers/master		\
 	servers/kernel		\
 	servers/crtc		\
 	servers/gamma		\

@@ -17,8 +17,8 @@
  */
 #include "arg.h"
 #include "util.h"
-#include "server.h"
 #include "state.h"
+#include "servers/master.h"
 #include "servers/kernel.h"
 #include "servers/crtc.h"
 #include "servers/gamma.h"
