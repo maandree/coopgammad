@@ -205,11 +205,24 @@ int merge_state(struct output* restrict old_outputs, size_t old_outputs_n)
  */
 int disconnect(void)
 {
+  size_t i;
+  
   if (!connected)
     return 0;
   connected = 0;
   
-  return 0; /* TODO disconnect() */
+  for (i = 0; i < outputs_n; i++)
+    {
+      outputs[i].crtc = NULL;
+      libgamma_crtc_destroy(crtcs + i);
+    }
+  free(crtcs), crtcs = NULL;
+  for (i = 0; i < site.partitions_available; i++)
+    libgamma_partition_destroy(partitions + i);
+  free(partitions), partitions = NULL;
+  libgamma_site_destroy(&site);
+  
+  return 0;
 }
 
 
