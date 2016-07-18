@@ -19,6 +19,8 @@
 #define SERVERS_CRTC_H
 
 
+#include "../types/output.h"
+
 #include <libgamma.h>
 
 
@@ -61,6 +63,15 @@ char* get_crtc_name(const libgamma_crtc_information_t* restrict info,
  * @return   Zero on success, -1 on error
  */
 int initialise_crtcs(void);
+
+/**
+ * Merge the new state with an old state
+ * 
+ * @param   old_outputs    The old `outputs`
+ * @param   old_outputs_n  The old `outputs_n`
+ * @return                 Zero on success, -1 on error
+ */
+int merge_state(struct output* restrict old_outputs, size_t old_outputs_n);
 
 
 #endif

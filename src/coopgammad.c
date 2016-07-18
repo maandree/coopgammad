@@ -530,77 +530,42 @@ static size_t unmarshal(const void* restrict buf)
 GCC_ONLY(__attribute__((nonnull)))
 static int unmarshal_and_merge_state(const char* restrict statefile)
 {
-  struct output* restrict new_outputs = outputs;
   struct output* restrict old_outputs = NULL;
-  size_t new_outputs_n = outputs_n;
-  size_t old_outputs_n = 0;
-  size_t i, j, k;
+  size_t i, n, r, old_outputs_n = 0;
   void* marshalled = NULL;
   int fd = -1, saved_errno;
-  
-  outputs = NULL;
-  outputs_n = 0;
   
   fd = open(statefile, O_RDONLY);
   if (fd < 0)
     goto fail;
-  if (!(marshalled = nread(fd, &k)))
+  if (!(marshalled = nread(fd, &n)))
     goto fail;
   close(fd), fd = -1;
   unlink(statefile), statefile = NULL;
   
-  if (unmarshal(marshalled) == 0)
+  old_outputs   = outputs;
+  old_outputs_n = outputs_n;
+  outputs   = NULL;
+  outputs_n = 0;
+  
+  r = unmarshal(marshalled);
+  if (r == 0)
     goto fail;
+  if (r != n)
+    {
+      fprintf(stderr, "%s: unmarshalled state file was %s than the unmarshalled state\n",
+	      argv0, n > r ? "larger" : "smaller");
+      errno = 0;
+      goto fail;
+    }
   free(marshalled), marshalled = NULL;
   
-  old_outputs   = outputs,   outputs   = new_outputs,   new_outputs   = NULL;
-  old_outputs_n = outputs_n, outputs_n = new_outputs_n, new_outputs_n = 0;
-  
-  i = j = new_outputs_n = 0;
-  while ((i < old_outputs_n) && (j < outputs_n))
-    {
-      int cmp = strcmp(old_outputs[i].name, outputs[j].name);
-      if (cmp <= 0)
-	new_outputs_n++;
-      i += cmp >= 0;
-      j += cmp <= 0;
-    }
-  new_outputs_n += outputs_n - j;
-  
-  new_outputs = calloc(new_outputs_n, sizeof(*new_outputs));
-  if (new_outputs == NULL)
+  if (merge_state(old_outputs, old_outputs_n) < 0)
     goto fail;
-  
-  i = j = k = new_outputs_n = 0;
-  while ((i < old_outputs_n) && (j < outputs_n))
-    {
-      int cmp = strcmp(old_outputs[i].name, outputs[j].name);
-      int is_same = 0;
-      if (cmp == 0)
-	is_same = (old_outputs[i].depth      == outputs[j].depth      &&
-		   old_outputs[i].red_size   == outputs[j].red_size   &&
-		   old_outputs[i].green_size == outputs[j].green_size &&
-		   old_outputs[i].blue_size  == outputs[j].blue_size);
-      if (is_same)
-	{
-	  new_outputs[k] = old_outputs[i];
-	  new_outputs[k].crtc = outputs[j].crtc;
-	  output_destroy(outputs + j);
-	  k++;
-	}
-      else if (cmp <= 0)
-	new_outputs[k++] = outputs[j];
-      i += cmp >= 0;
-      j += cmp <= 0;
-    }
-  while (j < outputs_n)
-    new_outputs[k++] = outputs[j++];
-  
-  outputs = new_outputs;
-  outputs_n = new_outputs_n;
   
   for (i = 0; i < old_outputs_n; i++)
     output_destroy(old_outputs + i);
+  free(old_outputs);
   
   return 0;
  fail:

@@ -127,3 +127,71 @@ int initialise_crtcs(void)
   return -1;
 }
 
+
+/**
+ * Merge the new state with an old state
+ * 
+ * @param   old_outputs    The old `outputs`
+ * @param   old_outputs_n  The old `outputs_n`
+ * @return                 Zero on success, -1 on error
+ */
+int merge_state(struct output* restrict old_outputs, size_t old_outputs_n)
+{
+  struct output* restrict new_outputs = NULL;
+  size_t new_outputs_n;
+  size_t i, j, k;
+  
+  /* How many outputs does the system now have? */
+  i = j = new_outputs_n = 0;
+  while ((i < old_outputs_n) && (j < outputs_n))
+    {
+      int cmp = strcmp(old_outputs[i].name, outputs[j].name);
+      if (cmp <= 0)
+	new_outputs_n++;
+      i += cmp >= 0;
+      j += cmp <= 0;
+    }
+  new_outputs_n += outputs_n - j;
+  
+  /* Allocate output state array */
+  if (new_outputs_n > 0)
+    {
+      new_outputs = calloc(new_outputs_n, sizeof(*new_outputs));
+      if (new_outputs == NULL)
+	return -1;
+    }
+  
+  /* Merge output states */
+  i = j = k = new_outputs_n = 0;
+  while ((i < old_outputs_n) && (j < outputs_n))
+    {
+      int is_same = 0, cmp = strcmp(old_outputs[i].name, outputs[j].name);
+      if (cmp == 0)
+	is_same = (old_outputs[i].depth      == outputs[j].depth      &&
+		   old_outputs[i].red_size   == outputs[j].red_size   &&
+		   old_outputs[i].green_size == outputs[j].green_size &&
+		   old_outputs[i].blue_size  == outputs[j].blue_size);
+      if (is_same)
+	{
+	  new_outputs[k] = old_outputs[i];
+	  new_outputs[k].crtc = outputs[j].crtc;
+	  memset(old_outputs + i, 0, sizeof(*old_outputs));
+	  outputs[j].crtc = NULL;
+	  output_destroy(outputs + j);
+	  k++;
+	}
+      else if (cmp <= 0)
+	new_outputs[k++] = outputs[j];
+      i += cmp >= 0;
+      j += cmp <= 0;
+    }
+  while (j < outputs_n)
+    new_outputs[k++] = outputs[j++];
+  
+  /* Commit merge */
+  outputs   = new_outputs;
+  outputs_n = new_outputs_n;
+  
+  return 0;
+}
+
