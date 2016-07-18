@@ -137,7 +137,7 @@ libgamma_crtc_state_t* restrict crtcs = NULL; /* do not marshal */
 /**
  * Preserve gamma ramps at priority 0?
  */
-int preserve = 0; /* do not marshal, pass on via command line arguments */
+int preserve = 0;
 
 
 
@@ -263,6 +263,10 @@ size_t state_marshal(void* restrict buf)
       off += n;
     }
   
+  if (bs != NULL)
+    *(int*)(bs + off) = preserve;
+  off += sizeof(int);
+  
   return off;
 }
 
@@ -353,6 +357,9 @@ size_t state_unmarshal(const void* restrict buf)
     }
   else
     off += sizeof(int);
+  
+  preserve = *(const int*)(bs + off);
+  off += sizeof(int);
   
   return off;
 }

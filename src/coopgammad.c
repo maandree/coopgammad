@@ -145,6 +145,7 @@ static void sig_terminate(int signo)
 static void sig_connection(int signo)
 {
   connection = signo - SIGRTMIN + 1;
+  signal(signo, sig_connection);
 }
 
 
@@ -180,6 +181,22 @@ static int get_method(const char* restrict arg)
   fprintf(stderr, "%s: unrecognised adjustment method name: %s\n", argv0, arg);
   errno = 0;
   return -1;
+}
+
+
+/**
+ * Set up signal handlers
+ * 
+ * @return  Zero on success, -1 on error
+ */
+static int set_up_signals(void)
+{
+  if ((signal(SIGUSR1,      sig_reexec)     == SIG_ERR) ||
+      (signal(SIGTERM,      sig_terminate)  == SIG_ERR) ||
+      (signal(SIGRTMIN + 0, sig_connection) == SIG_ERR) ||
+      (signal(SIGRTMIN + 1, sig_connection) == SIG_ERR))
+    return -1;
+  return 0;
 }
 
 
@@ -275,14 +292,12 @@ static enum init_status daemonise(int keep_stderr)
 /**
  * Initialise the process
  * 
- * @param   full         Perform a full initialisation, shall be done
- *                       iff the state is not going to be unmarshalled
  * @param   foreground   Keep process in the foreground
  * @param   keep_stderr  Keep stderr open
  * @param   query        Was -q used, see `main` for description
  * @return               An `enum init_status` value or an exit value
  */
-static enum init_status initialise(int full, int foreground, int keep_stderr, int query)
+static enum init_status initialise(int foreground, int keep_stderr, int query)
 {
   struct rlimit rlimit;
   size_t i, n;
@@ -293,7 +308,7 @@ static enum init_status initialise(int full, int foreground, int keep_stderr, in
   /* Zero out some memory so it can be destoried safely. */
   memset(&site, 0, sizeof(site));
   
-  if (full && !query)
+  if (!query)
     {
       /* Close all file descriptors above stderr */
       if (getrlimit(RLIMIT_NOFILE, &rlimit) || (rlimit.rlim_cur == RLIM_INFINITY))
@@ -325,21 +340,18 @@ static enum init_status initialise(int full, int foreground, int keep_stderr, in
   if (initialise_site() < 0)
     goto fail;
   
-  if (full)
+  /* Get PID file and socket pathname */
+  if (!(pidpath   = get_pidfile_pathname()) ||
+      !(socketpath = get_socket_pathname()))
+    goto fail;
+  
+  /* Create PID file */
+  if ((r = create_pidfile(pidpath)) < 0)
     {
-      /* Get PID file and socket pathname */
-      if (!(pidpath   = get_pidfile_pathname()) ||
-	  !(socketpath = get_socket_pathname()))
-	goto fail;
-      
-      /* Create PID file */
-      if ((r = create_pidfile(pidpath)) < 0)
-	{
-	  free(pidpath), pidpath = NULL;
-	  if (r == -2)
-	    return INIT_RUNNING;
-	  goto fail;
-	}
+      free(pidpath), pidpath = NULL;
+      if (r == -2)
+	return INIT_RUNNING;
+      goto fail;
     }
   
   /* Get partitions and CRTC:s */
@@ -362,33 +374,27 @@ static enum init_status initialise(int full, int foreground, int keep_stderr, in
   if (preserve && (preserve_gamma() < 0))
     goto fail;
   
-  if (full)
-    {
-      /* Create socket and start listening */
-      if (create_socket(socketpath) < 0)
-	goto fail;
-      
-      /* Get the real pathname of the process's binary, in case
-       * it is relative, so we can re-execute without problem. */
-      if ((*argv0 != '/') && strchr(argv0, '/') && !(argv0_real = realpath(argv0, NULL)))
-	goto fail;
-      
-      /* Change directory to / to avoid blocking umounting */
-      if (chdir("/") < 0)
-	perror(argv0);
-    }
+  /* Create socket and start listening */
+  if (create_socket(socketpath) < 0)
+    goto fail;
+  
+  /* Get the real pathname of the process's binary, in case
+   * it is relative, so we can re-execute without problem. */
+  if ((*argv0 != '/') && strchr(argv0, '/') && !(argv0_real = realpath(argv0, NULL)))
+    goto fail;
+  
+  /* Change directory to / to avoid blocking umounting */
+  if (chdir("/") < 0)
+    perror(argv0);
   
   /* Set up signal handlers */
-  if ((signal(SIGUSR1,      sig_reexec)     == SIG_ERR) ||
-      (signal(SIGTERM,      sig_terminate)  == SIG_ERR) ||
-      (signal(SIGRTMIN + 0, sig_connection) == SIG_ERR) ||
-      (signal(SIGRTMIN + 1, sig_connection) == SIG_ERR))
+  if (set_up_signals() < 0)
     goto fail;
   
   /* Place in the background unless -f */
-  if (full && (foreground == 0))
+  if (foreground == 0)
     return daemonise(keep_stderr);
-  else if (full)
+  else
     {
       /* Signal the spawner that the service is ready */
       close(STDOUT_FILENO);
@@ -514,25 +520,25 @@ static size_t unmarshal(const void* restrict buf)
 
 
 /**
- * Unmarshal the state of the process and merge with new state
+ * Do minimal initialisation, unmarshal the state of
+ * the process and merge with new state
  * 
  * @param   statefile  The state file
  * @return             Zero on success, -1 on error
  */
 GCC_ONLY(__attribute__((nonnull)))
-static int unmarshal_and_merge_state(const char* restrict statefile)
+static int restore_state(const char* restrict statefile)
 {
-  struct output* restrict old_outputs = NULL;
-  size_t i, n, r, old_outputs_n = 0;
   void* marshalled = NULL;
   int fd = -1, saved_errno;
+  size_t r, n;
+  
+  if (set_up_signals() < 0)
+    goto fail;
   
   fd = open(statefile, O_RDONLY);
   if (fd < 0)
     goto fail;
-  
-  old_outputs   = outputs,   outputs   = NULL;
-  old_outputs_n = outputs_n, outputs_n = 0;
   
   if (!(marshalled = nread(fd, &n)))
     goto fail;
@@ -549,14 +555,13 @@ static int unmarshal_and_merge_state(const char* restrict statefile)
       errno = 0;
       goto fail;
     }
-  free(marshalled), marshalled = NULL;
   
-  if (merge_state(old_outputs, old_outputs_n) < 0)
-    goto fail;
-  
-  for (i = 0; i < old_outputs_n; i++)
-    output_destroy(old_outputs + i);
-  free(old_outputs);
+  if (connected)
+    {
+      connected = 0;
+      if (reconnect() < 0)
+	goto fail;
+    }
   
   return 0;
  fail:
@@ -564,12 +569,72 @@ static int unmarshal_and_merge_state(const char* restrict statefile)
   if (fd >= 0)
     close(fd);
   free(marshalled);
-  for (i = 0; i < old_outputs_n; i++)
-    output_destroy(old_outputs + i);
-  free(old_outputs);
   errno = saved_errno;
   return -1;
 }
+
+
+/**
+ * Reexecute the server
+ * 
+ * Returns only on failure
+ * 
+ * @return  Pathname of file where the state is stored,
+ *          `NULL` if the state is in tact
+ */
+static char* reexecute(void)
+{
+  char* statefile = NULL;
+  char* statebuffer = NULL;
+  size_t buffer_size;
+  int fd = -1, saved_errno;
+  
+  statefile = get_state_pathname();
+  if (statefile == NULL)
+    goto fail;
+  
+  buffer_size = marshal(NULL);
+  statebuffer = malloc(buffer_size);
+  if (statebuffer == NULL)
+    goto fail;
+  if (marshal(statebuffer) != buffer_size)
+    {
+      fprintf(stderr, "%s: internal error", argv0);
+      errno = 0;
+      goto fail;
+    }
+  
+  fd = open(statefile, O_CREAT, S_IRUSR | S_IWUSR);
+  if (fd < 0)
+    goto fail;
+  
+  if (nwrite(fd, statebuffer, buffer_size) != buffer_size)
+    goto fail;
+  free(statebuffer), statebuffer = NULL;
+  
+  if ((close(fd) < 0) && (fd = -1, errno != EINTR))
+    goto fail;
+  fd = -1;
+  
+  destroy(0);
+  
+  execlp(argv0_real ? argv0_real : argv0, argv0, "- ", statefile, NULL);
+  saved_errno = errno;
+  free(argv0_real), argv0_real = NULL;
+  errno = saved_errno;
+  return statefile;
+  
+ fail:
+  saved_errno = errno;
+  free(statebuffer);
+  if (fd >= 0)
+    close(fd);
+  if (statefile != NULL)
+    unlink(statefile), free(statefile);
+  errno = saved_errno;
+  return NULL;
+}
+
 
 
 /**
@@ -640,67 +705,6 @@ static int print_method_and_site(int query)
   return 0;    
 }
 
-
-/**
- * Reexecute the server
- * 
- * Returns only on failure
- * 
- * @return  Pathname of file where the state is stored,
- *          `NULL` if the state is in tact
- */
-static char* reexecute(void)
-{
-  char* statefile = NULL;
-  char* statebuffer = NULL;
-  size_t buffer_size;
-  int fd = -1, saved_errno;
-  
-  statefile = get_state_pathname();
-  if (statefile == NULL)
-    goto fail;
-  
-  buffer_size = marshal(NULL);
-  statebuffer = malloc(buffer_size);
-  if (statebuffer == NULL)
-    goto fail;
-  if (marshal(statebuffer) != buffer_size)
-    {
-      fprintf(stderr, "%s: internal error", argv0);
-      errno = 0;
-      goto fail;
-    }
-  
-  fd = open(statefile, O_CREAT, S_IRUSR | S_IWUSR);
-  if (fd < 0)
-    goto fail;
-  
-  if (nwrite(fd, statebuffer, buffer_size) != buffer_size)
-    goto fail;
-  free(statebuffer), statebuffer = NULL;
-  
-  if ((close(fd) < 0) && (fd = -1, errno != EINTR))
-    goto fail;
-  fd = -1;
-  
-  destroy(0);
-  
-  execlp(argv0_real ? argv0_real : argv0, argv0, "- ", statefile, preserve ? "-p" : NULL, NULL);
-  saved_errno = errno;
-  free(argv0_real), argv0_real = NULL;
-  errno = saved_errno;
-  return statefile;
-  
- fail:
-  saved_errno = errno;
-  free(statebuffer);
-  if (fd >= 0)
-    close(fd);
-  if (statefile != NULL)
-    unlink(statefile), free(statefile);
-  errno = saved_errno;
-  return NULL;
-}
 
 
 /**
@@ -798,12 +802,22 @@ int main(int argc, char** argv)
   
  restart:
   
-  switch ((r = initialise(statefile == NULL, foreground, keep_stderr, query)))
+  if (statefile == NULL)
+    switch ((r = initialise(foreground, keep_stderr, query)))
+      {
+      case INIT_SUCCESS:  break;
+      case INIT_RUNNING:  rc = 2;  /* fall through */
+      case INIT_FAILURE:  goto fail;
+      default:            return r;
+      }
+  else if (restore_state(statefile) < 0)
+    goto fail;
+  else
     {
-    case INIT_SUCCESS:  break;
-    case INIT_RUNNING:  rc = 2;  /* fall through */
-    case INIT_FAILURE:  goto fail;
-    default:            return r;
+      if (reexec)
+	free(statefile);
+      unlink(statefile), statefile = NULL;
+      reexec = 0; /* See `if (reexec && !terminate)` below */
     }
   
   if (query)
@@ -811,16 +825,6 @@ int main(int argc, char** argv)
       if (print_method_and_site(query) < 0)
 	goto fail;
       goto done;
-    }
-  
-  if (statefile != NULL)
-    {
-      if (unmarshal_and_merge_state(statefile) < 0)
-	goto fail;
-      if (reexec)
-	free(statefile);
-      unlink(statefile), statefile = NULL;
-      reexec = 0; /* See `if (reexec && !terminate)` below */
     }
   
  reenter_loop:
