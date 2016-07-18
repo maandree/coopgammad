@@ -537,15 +537,14 @@ static int unmarshal_and_merge_state(const char* restrict statefile)
   fd = open(statefile, O_RDONLY);
   if (fd < 0)
     goto fail;
+  
+  old_outputs   = outputs,   outputs   = NULL;
+  old_outputs_n = outputs_n, outputs_n = 0;
+  
   if (!(marshalled = nread(fd, &n)))
     goto fail;
   close(fd), fd = -1;
   unlink(statefile), statefile = NULL;
-  
-  old_outputs   = outputs;
-  old_outputs_n = outputs_n;
-  outputs   = NULL;
-  outputs_n = 0;
   
   r = unmarshal(marshalled);
   if (r == 0)
