@@ -551,8 +551,8 @@ static int unmarshal_and_merge_state(const char* restrict statefile)
     goto fail;
   if (r != n)
     {
-      fprintf(stderr, "%s: unmarshalled state file was %s than the unmarshalled state\n",
-	      argv0, n > r ? "larger" : "smaller");
+      fprintf(stderr, "%s: unmarshalled state file was %s than the unmarshalled state: read %zu of %zu bytes\n",
+	      argv0, n > r ? "larger" : "smaller", r, n);
       errno = 0;
       goto fail;
     }
