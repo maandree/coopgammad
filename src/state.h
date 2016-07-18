@@ -151,6 +151,11 @@ extern libgamma_partition_state_t* restrict partitions;
  */
 extern libgamma_crtc_state_t* restrict crtcs;
 
+/**
+ * Preserve gamma ramps at priority 0?
+ */
+extern int preserve;
+
 
 
 /**

@@ -17,8 +17,10 @@
  */
 #include "crtc.h"
 #include "gamma.h"
+#include "coopgamma.h"
 #include "../state.h"
 #include "../communication.h"
+#include "../util.h"
 
 #include <errno.h>
 #include <string.h>
@@ -86,6 +88,33 @@ char* get_crtc_name(const libgamma_crtc_information_t* restrict info,
 	sprintf(name, "%zu.%zu", crtc->partition->partition, crtc->crtc);
       return name;
     }
+}
+
+
+/**
+ * Initialise the site
+ * 
+ * @return   Zero on success, -1 on error
+ */
+int initialise_site(void)
+{
+  char* restrict sitename_dup = NULL;
+  int gerror, saved_errno;
+  
+  if ((sitename != NULL) && !(sitename_dup = memdup(sitename, strlen(sitename) + 1)))
+    goto fail;
+  if ((gerror = libgamma_site_initialise(&site, method, sitename_dup)))
+    goto fail_libgamma;
+  
+  return 0;
+ fail_libgamma:
+  libgamma_perror(argv0, gerror);
+  errno = 0;
+ fail:
+  saved_errno = errno;
+  free(sitename_dup);
+  errno = saved_errno;
+  return -1;
 }
 
 
@@ -233,11 +262,58 @@ int disconnect(void)
  */
 int reconnect(void)
 {
+  struct output* restrict old_outputs = NULL;
+  size_t i, old_outputs_n = 0;
+  int saved_errno;
+  
   if (connected)
     return 0;
-  
   connected = 1;
+  
+  /* Get site */
+  if (initialise_site() < 0)
+    goto fail;
+  
+  /* Get partitions and CRTC:s */
+  if (initialise_crtcs() < 0)
+    goto fail;
+  
+  /* Get CRTC information */
+  if (outputs_n && !(outputs = calloc(outputs_n, sizeof(*outputs))))
+    goto fail;
+  if (initialise_gamma_info() < 0)
+    goto fail;
+  
+  /* Sort outputs */
+  qsort(outputs, outputs_n, sizeof(*outputs), output_cmp_by_name);
+  
+  /* Load current gamma ramps */
+  store_gamma();
+  
+  /* Preserve current gamma ramps at priority=0 if -p */
+  if (preserve && (preserve_gamma() < 0))
+    goto fail;
+  
+  /* Merge state */
+  old_outputs   = outputs,   outputs   = NULL;
+  old_outputs_n = outputs_n, outputs_n = 0;
+  if (merge_state(old_outputs, old_outputs_n) < 0)
+    goto fail;
+  for (i = 0; i < old_outputs_n; i++)
+    output_destroy(old_outputs + i);
+  free(old_outputs), old_outputs = NULL, old_outputs_n = 0;
+  
+  /* Reapply gamma ramps */
   reapply_gamma();
-  return 0; /* TODO reconnect() */
+  
+  return 0;
+  
+ fail:
+  saved_errno = errno;
+  for (i = 0; i < old_outputs_n; i++)
+    output_destroy(old_outputs + i);
+  free(old_outputs);
+  errno = saved_errno;
+  return -1;
 }
 

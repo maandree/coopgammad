@@ -277,19 +277,17 @@ static enum init_status daemonise(int keep_stderr)
  * 
  * @param   full         Perform a full initialisation, shall be done
  *                       iff the state is not going to be unmarshalled
- * @param   preserve     Preserve current gamma ramps at priority 0
  * @param   foreground   Keep process in the foreground
  * @param   keep_stderr  Keep stderr open
  * @param   query        Was -q used, see `main` for description
  * @return               An `enum init_status` value or an exit value
  */
-static enum init_status initialise(int full, int preserve, int foreground, int keep_stderr, int query)
+static enum init_status initialise(int full, int foreground, int keep_stderr, int query)
 {
   struct rlimit rlimit;
   size_t i, n;
   sigset_t mask;
-  char* restrict sitename_dup = NULL;
-  int s, gerror;
+  int s;
   enum init_status r;
   
   /* Zero out some memory so it can be destoried safely. */
@@ -324,10 +322,8 @@ static enum init_status initialise(int full, int preserve, int foreground, int k
     return INIT_SUCCESS;
   
   /* Get site */
-  if ((sitename != NULL) && !(sitename_dup = memdup(sitename, strlen(sitename) + 1)))
+  if (initialise_site() < 0)
     goto fail;
-  if ((gerror = libgamma_site_initialise(&site, method, sitename_dup)))
-    goto fail_libgamma;
   
   if (full)
     {
@@ -403,9 +399,6 @@ static enum init_status initialise(int full, int preserve, int foreground, int k
     }
   
   return INIT_SUCCESS;
- fail_libgamma:
-  libgamma_perror(argv0, gerror);
-  errno = 0;
  fail:
   return INIT_FAILURE;
 }
@@ -653,11 +646,10 @@ static int print_method_and_site(int query)
  * 
  * Returns only on failure
  * 
- * @param   preserve  Did -p appear on the comment line?
- * @return            Pathname of file where the state is stored,
- *                    `NULL` if the state is in tact
+ * @return  Pathname of file where the state is stored,
+ *          `NULL` if the state is in tact
  */
-static char* reexecute(int preserve)
+static char* reexecute(void)
 {
   char* statefile = NULL;
   char* statebuffer = NULL;
@@ -773,7 +765,7 @@ static void usage(void)
  */
 int main(int argc, char** argv)
 {
-  int rc = 1, preserve = 0, foreground = 0, keep_stderr = 0, query = 0, r;
+  int rc = 1, foreground = 0, keep_stderr = 0, query = 0, r;
   char* statefile = NULL;
   
   ARGBEGIN
@@ -806,7 +798,7 @@ int main(int argc, char** argv)
   
  restart:
   
-  switch ((r = initialise(statefile == NULL, preserve, foreground, keep_stderr, query)))
+  switch ((r = initialise(statefile == NULL, foreground, keep_stderr, query)))
     {
     case INIT_SUCCESS:  break;
     case INIT_RUNNING:  rc = 2;  /* fall through */
@@ -837,7 +829,7 @@ int main(int argc, char** argv)
   
   if (reexec && !terminate)
     {
-      if ((statefile = reexecute(preserve)))
+      if ((statefile = reexecute()))
 	{
 	  perror(argv0);
 	  fprintf(stderr, "%s: restoring state without re-executing\n", argv0);

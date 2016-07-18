@@ -134,6 +134,11 @@ libgamma_partition_state_t* restrict partitions = NULL; /* do not marshal */
  */
 libgamma_crtc_state_t* restrict crtcs = NULL; /* do not marshal */
 
+/**
+ * Preserve gamma ramps at priority 0?
+ */
+int preserve = 0; /* do not marshal, pass on via command line arguments */
+
 
 
 /**
