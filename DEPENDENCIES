@@ -1,0 +1,20 @@
+RUNTIME DEPENDENCIES:
+
+	libc
+	libgamma
+
+
+BUILD DEPENDENCIES:
+
+	libc
+	libgamma
+	cc
+	make
+	coreutils
+
+
+INSTALL DEPENDENCIES:
+
+	make
+	coreutils
+
