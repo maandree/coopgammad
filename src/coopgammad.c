@@ -355,7 +355,6 @@ static enum init_status initialise(int full, int preserve, int foreground, int k
     goto fail;
   if (initialise_gamma_info() < 0)
     goto fail;
-  free(crtcs), crtcs = NULL;
   
   /* Sort outputs */
   qsort(outputs, outputs_n, sizeof(*outputs), output_cmp_by_name);

@@ -155,11 +155,7 @@ void state_destroy(void)
   
   if (outputs != NULL)
     for (i = 0; i < outputs_n; i++)
-      {
-	if (crtcs == NULL)
-	  libgamma_crtc_destroy(outputs[i].crtc + i);
-	output_destroy(outputs + i);
-      }
+      output_destroy(outputs + i);
   free(outputs);
   if (crtcs != NULL)
     for (i = 0; i < outputs_n; i++)

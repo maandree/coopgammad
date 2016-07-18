@@ -207,8 +207,8 @@ int disconnect(void)
 {
   if (!connected)
     return 0;
-  
   connected = 0;
+  
   return 0; /* TODO disconnect() */
 }
 
