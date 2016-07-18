@@ -248,34 +248,13 @@ void restore_gamma(void)
 }
 
 
-
 /**
- * Disconnect from the site
- * 
- * @return  Zero on success, -1 on error
+ * Reapplu all gamma ramps
  */
-int disconnect(void)
-{
-  if (!connected)
-    return 0;
-  
-  connected = 0;
-  return 0; /* TODO disconnect() */
-}
-
-
-/**
- * Reconnect to the site
- * 
- * @return  Zero on success, -1 on error
- */
-int reconnect(void)
+void reapply_gamma(void)
 {
   union gamma_ramps plain;
   size_t i;
-  
-  if (connected)
-    return 0;
   
   /* Reapply gamma ramps */
   for (i = 0; i < outputs_n; i++)
@@ -290,8 +269,5 @@ int reconnect(void)
 	  libgamma_gamma_ramps8_destroy(&(plain.u8));
 	}
     }
-  
-  connected = 1;
-  return 0; /* TODO reconnect() */
 }
 

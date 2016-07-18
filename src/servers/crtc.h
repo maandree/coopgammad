@@ -74,5 +74,20 @@ int initialise_crtcs(void);
 int merge_state(struct output* restrict old_outputs, size_t old_outputs_n);
 
 
+/**
+ * Disconnect from the site
+ * 
+ * @return  Zero on success, -1 on error
+ */
+int disconnect(void);
+
+/**
+ * Reconnect to the site
+ * 
+ * @return  Zero on success, -1 on error
+ */
+int reconnect(void);
+
+
 #endif
 

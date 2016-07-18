@@ -76,18 +76,9 @@ void restore_gamma(void);
 
 
 /**
- * Disconnect from the site
- * 
- * @return  Zero on success, -1 on error
+ * Reapplu all gamma ramps
  */
-int disconnect(void);
-
-/**
- * Reconnect to the site
- * 
- * @return  Zero on success, -1 on error
- */
-int reconnect(void);
+void reapply_gamma(void);
 
 
 #endif

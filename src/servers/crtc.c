@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "crtc.h"
+#include "gamma.h"
 #include "../state.h"
 #include "../communication.h"
 
@@ -193,5 +194,37 @@ int merge_state(struct output* restrict old_outputs, size_t old_outputs_n)
   outputs_n = new_outputs_n;
   
   return 0;
+}
+
+
+
+/**
+ * Disconnect from the site
+ * 
+ * @return  Zero on success, -1 on error
+ */
+int disconnect(void)
+{
+  if (!connected)
+    return 0;
+  
+  connected = 0;
+  return 0; /* TODO disconnect() */
+}
+
+
+/**
+ * Reconnect to the site
+ * 
+ * @return  Zero on success, -1 on error
+ */
+int reconnect(void)
+{
+  if (connected)
+    return 0;
+  
+  connected = 1;
+  reapply_gamma();
+  return 0; /* TODO reconnect() */
 }
 
