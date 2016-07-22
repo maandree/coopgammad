@@ -660,7 +660,7 @@ static int print_method_and_site(int query)
 	    return -1;
 	  break;
 	}
-      if (!methodname)
+      if (methodname != NULL)
 	if (printf("%s\n", methodname) < 0)
 	  return -1;
     }
@@ -698,10 +698,8 @@ static int print_method_and_site(int query)
 	return -1;
     }
   
-  if (close(STDOUT_FILENO) < 0)
-    if (errno != EINTR)
-      return -1;
-  
+  if (fflush(stdout))
+    return -1;
   return 0;    
 }
 
