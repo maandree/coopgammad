@@ -257,7 +257,7 @@ int create_pidfile(char* pidpath)
   while ((p = strchr(p, '/')))
     {
       *p = '\0';
-      if (mkdir(pidpath, 0644) < 0)
+      if (mkdir(pidpath, 0755) < 0)
 	if (errno != EEXIST)
 	  return -1;
       *p++ = '/';
