@@ -148,7 +148,7 @@ static int is_pidfile_reusable(const char* restrict pidpath, const char* restric
 {
   /* PORTERS: /proc/$PID/environ is Linux specific */
   
-  char temp[sizeof("/proc//environ") + 3 * sizeof(pid_t)];
+  char temp[sizeof("/proc//environ") + 3 * sizeof(long long int)];
   int fd = -1, saved_errno, tries = 0;
   char* content = NULL;
   char* p;
@@ -191,9 +191,9 @@ static int is_pidfile_reusable(const char* restrict pidpath, const char* restric
     goto bad;
   if (*p)
     goto bad;
-  if ((size_t)(content - p) != n)
+  if ((size_t)(p - content) != n)
     goto bad;
-  sprintf(temp, "%llu", (unsigned long long)pid);
+  sprintf(temp, "%llu\n", (unsigned long long)pid);
   if (strcmp(content, temp))
     goto bad;
   
@@ -218,7 +218,7 @@ static int is_pidfile_reusable(const char* restrict pidpath, const char* restric
   
   return 1;
  bad:
-  fprintf(stderr, "%s: pid file contain invalid content: %s\n", argv0, pidpath);
+  fprintf(stderr, "%s: pid file contains invalid content: %s\n", argv0, pidpath);
   errno = 0;
   return -1;
  fail:
@@ -265,7 +265,7 @@ int create_pidfile(char* pidpath)
   
   /* Create PID file. */
  retry:
-  fd = open(pidpath, O_CREAT | O_EXCL, 0644);
+  fd = open(pidpath, O_CREAT | O_EXCL | O_WRONLY, 0644);
   if (fd < 0)
     {
       if (errno == EINTR)
