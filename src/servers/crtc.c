@@ -43,7 +43,7 @@ int handle_enumerate_crtcs(size_t conn, const char* restrict message_id)
   for (i = 0; i < outputs_n; i++)
     n += strlen(outputs[i].name) + 1;
   
-  MAKE_MESSAGE(&buf, &n, 0,
+  MAKE_MESSAGE(&buf, &n, n,
 	       "Command: crtc-enumeration\n"
 	       "In response to: %s\n"
 	       "Length: %zu\n"

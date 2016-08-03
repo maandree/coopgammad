@@ -23,15 +23,21 @@
 #include "../communication.h"
 #include "../state.h"
 
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+
+
+/**
+ * All poll(3p) events that are not for writing
+ */
+#define NON_WR_POLL_EVENTS  (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI | POLLERR | POLLHUP | POLLNVAL)
 
 
 /**
@@ -115,24 +121,43 @@ static int dispatch_message(size_t conn, struct message* restrict msg)
  * Sets the file descriptor set that includes
  * the server socket and all connections
  * 
- * @param   fds  The file descritor set
- * @return       The highest set file descritor plus 1
+ * The file descriptor will be ordered as in
+ * the array `connections`, `socketfd` will
+ * be last.
+ * 
+ * @param   fds        Reference parameter for the array of file descriptors
+ * @param   fdn        Output parameter for the number of file descriptors
+ * @parma   fds_alloc  Reference parameter for the allocation size of `fds`, in elements
+ * @return             Zero on success, -1 on error
  */
-GCC_ONLY(__attribute__((nonnull)))
-static int update_fdset(fd_set* restrict fds)
+static int update_fdset(struct pollfd** restrict fds, nfds_t* restrict fdn, nfds_t* restrict fds_alloc)
 {
-  int fdmax = socketfd;
   size_t i;
-  FD_ZERO(fds);
-  FD_SET(socketfd, fds);
+  nfds_t j = 0;
+  
+  if (connections_used + 1 > *fds_alloc)
+    {
+      void* new = realloc(*fds, (connections_used + 1) * sizeof(**fds));
+      if (new == NULL)
+	return -1;
+      *fds = new;
+      *fds_alloc = connections_used + 1;
+    }
+  
   for (i = 0; i < connections_used; i++)
     if (connections[i] >= 0)
       {
-	FD_SET(connections[i], fds);
-	if (fdmax < connections[i])
-	  fdmax = connections[i];
+	(*fds)[j].fd = connections[i];
+	(*fds)[j].events = NON_WR_POLL_EVENTS;
+	j++;
       }
-  return fdmax + 1;
+  
+  (*fds)[j].fd = socketfd;
+  (*fds)[j].events = NON_WR_POLL_EVENTS;
+  j++;
+  
+  *fdn = j;
+  return 0;
 }
 
 
@@ -245,7 +270,7 @@ static int handle_connection(size_t conn)
       connections[conn] = -1;
       if (conn < connections_ptr)
 	connections_ptr = conn;
-      if (conn == connections_used)
+      while ((connections_used > 0) && (connections[connections_used - 1] < 0))
 	connections_used -= 1;
       message_destroy(msg);
       if (connection_closed(fd) < 0)
@@ -283,60 +308,77 @@ void disconnect_all(void)
  */
 int main_loop(void)
 {
-  fd_set fds_orig, fds_rd, fds_wr, fds_ex;
-  int i, r, update, fdn = update_fdset(&fds_orig);
+  struct pollfd* fds = NULL;
+  nfds_t i, fdn = 0, fds_alloc = 0;
+  int r, update, saved_errno;
   size_t j;
+  
+  if (update_fdset(&fds, &fdn, &fds_alloc) < 0)
+    goto fail;
   
   while (!reexec && !terminate)
     {
       if (connection)
 	{
 	  if ((connection == 1 ? disconnect() : reconnect()) < 0)
-	    return connection = 0, -1;
+	    {
+	      connection = 0;
+	      goto fail;
+	    }
 	  connection = 0;
 	}
       
-      memcpy(&fds_rd, &fds_orig, sizeof(fd_set));
-      memcpy(&fds_ex, &fds_orig, sizeof(fd_set));
+      for (j = 0, i = 0; j < connections_used; j++)
+	if (connections[j] >= 0)
+	  {
+	    if (ring_have_more(outbound + j))
+	      fds[(size_t)i++ + j].events |= POLLOUT;
+	    else
+	      fds[(size_t)i++ + j].events &= ~POLLOUT;
+	  }
       
-      FD_ZERO(&fds_wr);
-      for (j = 0; j < connections_used; j++)
-	if ((connections[j] >= 0) && ring_have_more(outbound + j))
-	  FD_SET(connections[j], &fds_wr);
-      
-      if (select(fdn, &fds_rd, &fds_wr, &fds_ex, NULL) < 0)
+      if (poll(fds, fdn, -1) < 0)
 	{
-	  if (errno == EINTR)
-	    continue;
-	  return -1;
+	  if (errno == EAGAIN)
+	    perror(argv0);
+	  else if (errno != EINTR)
+	    goto fail;
 	}
       
       update = 0;
       for (i = 0; i < fdn; i++)
 	{
-	  int do_read  = FD_ISSET(i, &fds_rd) || FD_ISSET(i, &fds_ex);
-	  int do_write = FD_ISSET(i, &fds_wr);
+	  int do_read  = fds[i].revents & NON_WR_POLL_EVENTS;
+	  int do_write = fds[i].revents & POLLOUT;
+	  int fd = fds[i].fd;
 	  if (!do_read && !do_write)
 	    continue;
 	  
-	  if (i == socketfd)
+	  if (fd == socketfd)
 	    r = handle_server();
 	  else
 	    {
-	      for (j = 0; connections[j] != i; j++);
+	      for (j = 0; connections[j] != fd; j++);
 	      r = do_read ? handle_connection(j) : 0;
 	    }
 	  
 	  if ((r >= 0) && do_write)
 	    r |= continue_send(j);
 	  if (r < 0)
-	    return -1;
+	    goto fail;
 	  update |= (r > 0);
 	}
       if (update)
-	update_fdset(&fds_orig);
+	if (update_fdset(&fds, &fdn, &fds_alloc) < 0)
+	  goto fail;
     }
   
+  free(fds);
   return 0;
+ fail:
+  saved_errno = errno;
+  free(fds);
+  errno = saved_errno;
+  return -1;
 }
 

@@ -321,7 +321,7 @@ int handle_get_gamma(size_t conn, const char* restrict message_id, const char* r
 	n += strlen(output->table_filters[i].class) + 1;
     }
   
-  MAKE_MESSAGE(&buf, &n, 0,
+  MAKE_MESSAGE(&buf, &n, n,
 	       "In response to: %s\n"
 	       "Depth: %s\n"
 	       "Red size: %zu\n"

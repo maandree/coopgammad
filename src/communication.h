@@ -43,17 +43,17 @@
  * @param  format:string-literal  Message format string
  * @param  ...                    Message formatting arguments
  */
-#define MAKE_MESSAGE(bufp, np, extra, format, ...)		\
-  do								\
-    {								\
-      ssize_t m__;						\
-      snprintf(NULL, 0, format "%zn", __VA_ARGS__, &m__);	\
-      *(bufp) = malloc((size_t)(extra) + (size_t)m__);		\
-      if (*(bufp) == NULL)					\
-	return -1;						\
-      sprintf(*(bufp), format, __VA_ARGS__);			\
-      *(np) = (size_t)m__;					\
-    }								\
+#define MAKE_MESSAGE(bufp, np, extra, format, ...)			\
+  do									\
+    {									\
+      ssize_t m__;							\
+      snprintf(NULL, 0, format "%zn", __VA_ARGS__, &m__);		\
+      *(bufp) = malloc((size_t)(extra) + (size_t)m__ + (size_t)1);	\
+      if (*(bufp) == NULL)						\
+	return -1;							\
+      sprintf(*(bufp), format, __VA_ARGS__);				\
+      *(np) = (size_t)m__;						\
+    }									\
   while (0)
 
 /**
