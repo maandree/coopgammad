@@ -214,11 +214,17 @@ static int handle_server(void)
       if (message_initialise(inbound + connections_ptr))
 	goto fail;
     }
+  else
+    {
+      connections[connections_ptr] = fd;
+      ring_initialise(outbound + connections_ptr);
+      if (message_initialise(inbound + connections_ptr))
+	goto fail;
+    }
   
   connections_ptr++;
-  while (connections_ptr < connections_used)
-    if (connections[connections_ptr] >= 0)
-      connections_ptr++;
+  while ((connections_ptr < connections_used) && (connections[connections_ptr] >= 0))
+    connections_ptr++;
   if (connections_used < connections_ptr)
     connections_used = connections_ptr;
   
@@ -273,6 +279,7 @@ static int handle_connection(size_t conn)
       while ((connections_used > 0) && (connections[connections_used - 1] < 0))
 	connections_used -= 1;
       message_destroy(msg);
+      ring_destroy(outbound + conn);
       if (connection_closed(fd) < 0)
 	return -1;
       return 1;
