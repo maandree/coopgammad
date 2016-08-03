@@ -125,6 +125,46 @@ size_t output_marshal(const struct output* restrict this, void* restrict buf)
     *(enum libgamma_decision*)(bs + off) = this->supported;
   off += sizeof(enum libgamma_decision);
   
+  if (bs != NULL)
+    *(enum colourspace*)(bs + off) = this->colourspace;
+  off += sizeof(enum colourspace);
+  
+  if (bs != NULL)
+    *(int*)(bs + off) = this->name_is_edid;
+  off += sizeof(int);
+  
+  if (bs != NULL)
+    *(unsigned*)(bs + off) = this->red_x;
+  off += sizeof(unsigned);
+  
+  if (bs != NULL)
+    *(unsigned*)(bs + off) = this->red_y;
+  off += sizeof(unsigned);
+  
+  if (bs != NULL)
+    *(unsigned*)(bs + off) = this->green_x;
+  off += sizeof(unsigned);
+  
+  if (bs != NULL)
+    *(unsigned*)(bs + off) = this->green_y;
+  off += sizeof(unsigned);
+  
+  if (bs != NULL)
+    *(unsigned*)(bs + off) = this->blue_x;
+  off += sizeof(unsigned);
+  
+  if (bs != NULL)
+    *(unsigned*)(bs + off) = this->blue_y;
+  off += sizeof(unsigned);
+  
+  if (bs != NULL)
+    *(unsigned*)(bs + off) = this->white_x;
+  off += sizeof(unsigned);
+  
+  if (bs != NULL)
+    *(unsigned*)(bs + off) = this->white_y;
+  off += sizeof(unsigned);
+  
   n = strlen(this->name) + 1;
   if (bs != NULL)
     memcpy(bs + off, this->name, n);
@@ -178,6 +218,36 @@ size_t output_unmarshal(struct output* restrict this, const void* restrict buf)
   
   this->supported = *(const enum libgamma_decision*)(bs + off);
   off += sizeof(enum libgamma_decision);
+  
+  this->colourspace = *(const enum colourspace*)(bs + off);
+  off += sizeof(enum colourspace);
+  
+  this->name_is_edid = *(const int*)(bs + off);
+  off += sizeof(int);
+  
+  this->red_x = *(const unsigned*)(bs + off);
+  off += sizeof(unsigned);
+  
+  this->red_y = *(const unsigned*)(bs + off);
+  off += sizeof(unsigned);
+  
+  this->green_x = *(const unsigned*)(bs + off);
+  off += sizeof(unsigned);
+  
+  this->green_y = *(const unsigned*)(bs + off);
+  off += sizeof(unsigned);
+  
+  this->blue_x = *(const unsigned*)(bs + off);
+  off += sizeof(unsigned);
+  
+  this->blue_y = *(const unsigned*)(bs + off);
+  off += sizeof(unsigned);
+  
+  this->white_x = *(const unsigned*)(bs + off);
+  off += sizeof(unsigned);
+  
+  this->white_y = *(const unsigned*)(bs + off);
+  off += sizeof(unsigned);
   
   n = strlen(bs + off) + 1;
   this->name = memdup(bs + off, n);

@@ -55,6 +55,49 @@
 
 
 /**
+ * Colour spaces
+ */
+enum colourspace
+{
+  /**
+   * sRGB with explicit gamut
+   */
+  COLOURSPACE_SRGB = 0,
+  
+  /**
+   * sRGB without explicit gamut
+   */
+  COLOURSPACE_SRGB_SANS_GAMUT = 1,
+  
+  /**
+   * RGB (but not sRGB) with known gamut
+   */
+  COLOURSPACE_RGB = 2,
+  
+  /**
+   * RGB (but not sRGB) without known gamut
+   */
+  COLOURSPACE_RGB_SANS_GAMUT = 3,
+  
+  /**
+   * Non-RGB multicolour
+   */
+  COLOURSPACE_NON_RGB = 4,
+  
+  /**
+   * Greyscale or monochrome
+   */
+  COLOURSPACE_GREY = 5,
+  
+  /**
+   * Unknown
+   */
+  COLOURSPACE_UNKNOWN = 6
+};
+
+
+
+/**
  * Information about an output
  */
 struct output
@@ -73,6 +116,64 @@ struct output
    * Whether gamma ramps are supported
    */
   enum libgamma_decision supported;
+  
+  /**
+   * Whether the name is the EDID
+   */
+  int name_is_edid;
+  
+  /**
+   * The monitor's colour space
+   */
+  enum colourspace colourspace;
+  
+  /**
+   * The x-value (CIE xyY) of the monitor's
+   * red colour, multiplied by 1024
+   */
+  unsigned red_x;
+  
+  /**
+   * The y-value (CIE xyY) of the monitor's
+   * red colour, multiplied by 1024
+   */
+  unsigned red_y;
+  
+  /**
+   * The x-value (CIE xyY) of the monitor's
+   * green colour, multiplied by 1024
+   */
+  unsigned green_x;
+  
+  /**
+   * The y-value (CIE xyY) of the monitor's
+   * green colour, multiplied by 1024
+   */
+  unsigned green_y;
+  
+  /**
+   * The x-value (CIE xyY) of the monitor's
+   * blue colour, multiplied by 1024
+   */
+  unsigned blue_x;
+  
+  /**
+   * The y-value (CIE xyY) of the monitor's
+   * blue colour, multiplied by 1024
+   */
+  unsigned blue_y;
+  
+  /**
+   * The x-value (CIE xyY) of the monitor's
+   * default white point, multiplied by 1024
+   */
+  unsigned white_x;
+  
+  /**
+   * The y-value (CIE xyY) of the monitor's
+   * default white point, multiplied by 1024
+   */
+  unsigned white_y;
   
   /**
    * The number of stops in the red gamma ramp

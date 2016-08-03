@@ -47,6 +47,8 @@ int handle_get_gamma_info(size_t conn, const char* restrict message_id, const ch
   char* restrict buf;
   char depth[3];
   const char* supported;
+  const char* colourspace;
+  char* gamut[8 * sizeof("White x: 1023")];
   size_t n;
   
   if (crtc == NULL)  return send_error("protocol error: 'CRTC' header omitted");
@@ -71,6 +73,38 @@ int handle_get_gamma_info(size_t conn, const char* restrict message_id, const ch
     default:              supported = "maybe";  break;
     }
   
+  switch (output->colourspace)
+    {
+    case COLOURSPACE_SRGB_SANS_GAMUT:
+    case COLOURSPACE_SRGB:     colourspace = "Colour space: sRGB\n";     break;
+    case COLOURSPACE_RGB_SANS_GAMUT:
+    case COLOURSPACE_RGB:      colourspace = "Colour space: RGB\n";      break;
+    case COLOURSPACE_NON_RGB:  colourspace = "Colour space: non-RGB\n";  break;
+    case COLOURSPACE_GREY:     colourspace = "Colour space: grey\n";     break;
+    default:                   colourspace = "";                         break;
+    }
+  
+  switch (output->colourspace)
+    {
+    case COLOURSPACE_SRGB:
+    case COLOURSPACE_RGB:
+      sprintf(gamut,
+	      "Red x: %u\n"
+	      "Red y: %u\n"
+	      "Green x: %u\n"
+	      "Green y: %u\n"
+	      "Blue x: %u\n"
+	      "Blue y: %u\n"
+	      "White x: %u\n"
+	      "White y: %u\n",
+	      output->red_x, output->red_y, output->green_x, output->green_y,
+	      output->blue_x, output->blue_y, output->white_x, output->white_y);
+      break;
+    default:
+      *gamut = '\0';
+      break;
+    }
+  
   MAKE_MESSAGE(&buf, &n, 0,
 	       "In response to: %s\n"
 	       "Cooperative: yes\n" /* In mds: say ‘no’, mds-coopgamma changes to ‘yes’.” */
@@ -79,9 +113,10 @@ int handle_get_gamma_info(size_t conn, const char* restrict message_id, const ch
 	       "Green size: %zu\n"
 	       "Blue size: %zu\n"
 	       "Gamma support: %s\n"
+	       "%s%s"
 	       "\n",
 	       message_id, depth, output->red_size, output->green_size,
-	       output->blue_size, supported);
+	       output->blue_size, supported, gamut, colourspace);
   
   return send_message(conn, buf, n);
 }
@@ -116,6 +151,90 @@ void set_gamma(const struct output* restrict output, const union gamma_ramps* re
 }
 
 
+/**
+ * Parse the EDID of a monitor
+ * 
+ * @param  output  The output
+ */
+static void parse_edid(struct output* restrict output)
+{
+  const unsigned char* restrict edid = (const unsigned char*)(output->name);
+  size_t i;
+  unsigned char sum;
+  int analogue;
+  
+  output->red_x = output->green_x = output->blue_x = output->white_x = 0;
+  output->red_y = output->green_y = output->blue_y = output->white_y = 0;
+  
+  if (output->name_is_edid == 0)
+    {
+      output->colourspace = COLOURSPACE_UNKNOWN;
+      return;
+    }
+  
+  if (strlen(edid) < 128)
+    return;
+  for (i = 0, sum = 0; i < 128; i++)
+    sum += edid[i];
+  if (sum != 0)
+    return;
+  if ((edid[0] != 0) || (edid[7] != 0))
+    return;
+  for (i = 1; i < 7; i++)
+    if (edid[i] != 0xFF)
+      return;
+  
+  analogue = !(edid[20] & 0x80);
+  if (!analogue)
+    output->colourspace = COLOURSPACE_RGB;
+  else
+    switch ((edid[24] >> 3) & 3)
+      {
+      case 0:   output->colourspace = COLOURSPACE_GREY;     break;
+      case 1:   output->colourspace = COLOURSPACE_RGB;      break;
+      case 2:   output->colourspace = COLOURSPACE_NON_RGB;  break;
+      default:  output->colourspace = COLOURSPACE_UNKNOWN;  break;
+      }
+  
+  if (output->colourspace != COLOURSPACE_RGB)
+    return;
+  
+  if (edid[24] & 2)
+    output->colourspace = COLOURSPACE_SRGB;
+  
+  output->red_x   = (edid[25] >> 6) & 3;
+  output->red_y   = (edid[25] >> 4) & 3;
+  output->green_x = (edid[25] >> 2) & 3;
+  output->green_y = (edid[25] >> 0) & 3;
+  output->blue_x  = (edid[26] >> 6) & 3;
+  output->blue_y  = (edid[26] >> 4) & 3;
+  output->white_x = (edid[26] >> 2) & 3;
+  output->white_y = (edid[26] >> 0) & 3;
+  
+  output->red_x   |= ((unsigned)(edid[27])) << 2;
+  output->red_y   |= ((unsigned)(edid[28])) << 2;
+  output->green_x |= ((unsigned)(edid[29])) << 2;
+  output->green_y |= ((unsigned)(edid[30])) << 2;
+  output->blue_x  |= ((unsigned)(edid[31])) << 2;
+  output->blue_y  |= ((unsigned)(edid[32])) << 2;
+  output->white_x |= ((unsigned)(edid[33])) << 2;
+  output->white_y |= ((unsigned)(edid[34])) << 2;
+  
+  if ((output->red_x == output->red_y)   &&
+      (output->red_x == output->green_x) &&
+      (output->red_x == output->green_y) &&
+      (output->red_x == output->blue_x)  &&
+      (output->red_x == output->blue_y)  &&
+      (output->red_x == output->white_x) &&
+      (output->red_x == output->white_y))
+    {
+      if (output->colourspace == COLOURSPACE_SRGB)
+	output->colourspace = COLOURSPACE_SRGB_SANS_GAMUT;
+      else
+	output->colourspace = COLOURSPACE_RGB_SANS_GAMUT;
+    }
+}
+
 
 /**
  * Store all current gamma ramps
@@ -135,17 +254,18 @@ int initialise_gamma_info(void)
 				    LIBGAMMA_CRTC_INFO_MACRO_RAMP |
 				    LIBGAMMA_CRTC_INFO_GAMMA_SUPPORT |
 				    LIBGAMMA_CRTC_INFO_CONNECTOR_NAME);
-      outputs[i].depth       = info.gamma_depth_error   ? 0 : info.gamma_depth;
-      outputs[i].red_size    = info.gamma_size_error    ? 0 : info.red_gamma_size;
-      outputs[i].green_size  = info.gamma_size_error    ? 0 : info.green_gamma_size;
-      outputs[i].blue_size   = info.gamma_size_error    ? 0 : info.blue_gamma_size;
-      outputs[i].supported   = info.gamma_support_error ? 0 : info.gamma_support;
+      outputs[i].depth        = info.gamma_depth_error   ? 0 : info.gamma_depth;
+      outputs[i].red_size     = info.gamma_size_error    ? 0 : info.red_gamma_size;
+      outputs[i].green_size   = info.gamma_size_error    ? 0 : info.green_gamma_size;
+      outputs[i].blue_size    = info.gamma_size_error    ? 0 : info.blue_gamma_size;
+      outputs[i].supported    = info.gamma_support_error ? 0 : info.gamma_support;
       if (outputs[i].depth      == 0 || outputs[i].red_size  == 0 ||
 	  outputs[i].green_size == 0 || outputs[i].blue_size == 0)
-	outputs[i].supported = 0;
-      outputs[i].name        = get_crtc_name(&info, crtcs + i);
+	outputs[i].supported  = 0;
+      outputs[i].name         = get_crtc_name(&info, crtcs + i);
       saved_errno = errno;
-      outputs[i].crtc        = crtcs + i;
+      outputs[i].name_is_edid = ((info.edid_error == 0) && (info.edid != NULL));
+      outputs[i].crtc         = crtcs + i;
       libgamma_crtc_information_destroy(&info);
       outputs[i].ramps_size = outputs[i].red_size + outputs[i].green_size + outputs[i].blue_size;
       switch (outputs[i].depth)
@@ -163,6 +283,7 @@ int initialise_gamma_info(void)
       errno = saved_errno;
       if (outputs[i].name == NULL)
 	return -1;
+      parse_edid(outputs + i);
     }
   
   return 0;
