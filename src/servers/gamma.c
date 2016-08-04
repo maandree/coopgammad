@@ -258,6 +258,8 @@ int initialise_gamma_info(void)
       outputs[i].green_size   = info.gamma_size_error    ? 0 : info.green_gamma_size;
       outputs[i].blue_size    = info.gamma_size_error    ? 0 : info.blue_gamma_size;
       outputs[i].supported    = info.gamma_support_error ? 0 : info.gamma_support;
+      if (info.gamma_support_error == LIBGAMMA_CRTC_INFO_NOT_SUPPORTED)
+	outputs[i].supported = LIBGAMMA_MAYBE;
       if (outputs[i].depth      == 0 || outputs[i].red_size  == 0 ||
 	  outputs[i].green_size == 0 || outputs[i].blue_size == 0)
 	outputs[i].supported  = 0;
