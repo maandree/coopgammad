@@ -78,6 +78,7 @@ static int dispatch_message(size_t conn, struct message* restrict msg)
       else if (strstr(header, "Class: ")         == header)  class         = value;
       else if (strstr(header, "Lifespan: ")      == header)  lifespan      = value;
       else if (strstr(header, "Message ID: ")    == header)  message_id    = value;
+      else if (strstr(header, "Length: ")        == header)  ;/* Handled transparently */
       else
 	fprintf(stderr, "%s: ignoring unrecognised header: %s\n", argv0, header);
     }
