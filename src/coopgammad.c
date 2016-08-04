@@ -599,7 +599,7 @@ static char* reexecute(void)
     goto fail;
   if (marshal(statebuffer) != buffer_size)
     {
-      fprintf(stderr, "%s: internal error", argv0);
+      fprintf(stderr, "%s: internal error\n", argv0);
       errno = 0;
       goto fail;
     }

@@ -116,7 +116,7 @@ static ssize_t remove_filter(struct output* restrict out, struct filter* restric
   
   if (i == out->table_size)
     {
-      fprintf(stderr, "%s: ignoring attempt to removing non-existing filter on CRTC %s: %s",
+      fprintf(stderr, "%s: ignoring attempt to removing non-existing filter on CRTC %s: %s\n",
 	      argv0, out->name, filter->class);
       return (ssize_t)(out->table_size);
     }
