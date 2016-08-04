@@ -48,7 +48,7 @@ int handle_get_gamma_info(size_t conn, const char* restrict message_id, const ch
   char depth[3];
   const char* supported;
   const char* colourspace;
-  char* gamut[8 * sizeof("White x: 1023")];
+  char gamut[8 * sizeof("White x: 1023")];
   size_t n;
   
   if (crtc == NULL)  return send_error("protocol error: 'CRTC' header omitted");
@@ -160,8 +160,7 @@ static void parse_edid(struct output* restrict output)
 {
   const unsigned char* restrict edid = (const unsigned char*)(output->name);
   size_t i;
-  unsigned char sum;
-  int analogue;
+  int sum, analogue;
   
   output->red_x = output->green_x = output->blue_x = output->white_x = 0;
   output->red_y = output->green_y = output->blue_y = output->white_y = 0;
@@ -172,11 +171,11 @@ static void parse_edid(struct output* restrict output)
       return;
     }
   
-  if (strlen(edid) < 128)
+  if (strlen((const char*)edid) < 128)
     return;
   for (i = 0, sum = 0; i < 128; i++)
-    sum += edid[i];
-  if (sum != 0)
+    sum += (int)edid[i];
+  if ((sum & 0xFF) != 0)
     return;
   if ((edid[0] != 0) || (edid[7] != 0))
     return;
