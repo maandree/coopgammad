@@ -155,26 +155,23 @@ void set_gamma(const struct output* restrict output, const union gamma_ramps* re
  * Parse the EDID of a monitor
  * 
  * @param  output  The output
+ * @param  edid    The EDID in binary format
+ * @param  n       The length of the EDID
  */
-static void parse_edid(struct output* restrict output)
+static void parse_edid(struct output* restrict output, const unsigned char* restrict edid, size_t n)
 {
-  const unsigned char* restrict edid = (const unsigned char*)(output->name);
   size_t i;
-  int sum, analogue;
+  int analogue;
+  unsigned sum;
   
   output->red_x = output->green_x = output->blue_x = output->white_x = 0;
   output->red_y = output->green_y = output->blue_y = output->white_y = 0;
+  output->colourspace = COLOURSPACE_UNKNOWN;
   
-  if (output->name_is_edid == 0)
-    {
-      output->colourspace = COLOURSPACE_UNKNOWN;
-      return;
-    }
-  
-  if (strlen((const char*)edid) < 128)
+  if ((edid == NULL) || (n < 128))
     return;
   for (i = 0, sum = 0; i < 128; i++)
-    sum += (int)edid[i];
+    sum += (unsigned)edid[i];
   if ((sum & 0xFF) != 0)
     return;
   if ((edid[0] != 0) || (edid[7] != 0))
@@ -198,7 +195,7 @@ static void parse_edid(struct output* restrict output)
   if (output->colourspace != COLOURSPACE_RGB)
     return;
   
-  if (edid[24] & 2)
+  if (edid[24] & 4)
     output->colourspace = COLOURSPACE_SRGB;
   
   output->red_x   = (edid[25] >> 6) & 3;
@@ -263,6 +260,7 @@ int initialise_gamma_info(void)
       if (outputs[i].depth      == 0 || outputs[i].red_size  == 0 ||
 	  outputs[i].green_size == 0 || outputs[i].blue_size == 0)
 	outputs[i].supported  = 0;
+      parse_edid(outputs + i, info.edid_error ? NULL : info.edid, info.edid_error ? 0 : info.edid_length);
       outputs[i].name         = get_crtc_name(&info, crtcs + i);
       saved_errno = errno;
       outputs[i].name_is_edid = ((info.edid_error == 0) && (info.edid != NULL));
@@ -284,7 +282,6 @@ int initialise_gamma_info(void)
       errno = saved_errno;
       if (outputs[i].name == NULL)
 	return -1;
-      parse_edid(outputs + i);
     }
   
   return 0;

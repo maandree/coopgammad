@@ -59,40 +59,41 @@
  */
 enum colourspace
 {
-  /**
-   * sRGB with explicit gamut
-   */
-  COLOURSPACE_SRGB = 0,
-  
-  /**
-   * sRGB without explicit gamut
-   */
-  COLOURSPACE_SRGB_SANS_GAMUT = 1,
-  
-  /**
-   * RGB (but not sRGB) with known gamut
-   */
-  COLOURSPACE_RGB = 2,
-  
-  /**
-   * RGB (but not sRGB) without known gamut
-   */
-  COLOURSPACE_RGB_SANS_GAMUT = 3,
-  
-  /**
-   * Non-RGB multicolour
-   */
-  COLOURSPACE_NON_RGB = 4,
-  
-  /**
-   * Greyscale or monochrome
-   */
-  COLOURSPACE_GREY = 5,
   
   /**
    * Unknown
    */
-  COLOURSPACE_UNKNOWN = 6
+  COLOURSPACE_UNKNOWN = 0,
+  
+  /**
+   * sRGB with explicit gamut
+   */
+  COLOURSPACE_SRGB = 1,
+  
+  /**
+   * sRGB without explicit gamut
+   */
+  COLOURSPACE_SRGB_SANS_GAMUT = 2,
+  
+  /**
+   * RGB (but not sRGB) with known gamut
+   */
+  COLOURSPACE_RGB = 3,
+  
+  /**
+   * RGB (but not sRGB) without known gamut
+   */
+  COLOURSPACE_RGB_SANS_GAMUT = 4,
+  
+  /**
+   * Non-RGB multicolour
+   */
+  COLOURSPACE_NON_RGB = 5,
+  
+  /**
+   * Greyscale or monochrome
+   */
+  COLOURSPACE_GREY = 6
 };
 
 
