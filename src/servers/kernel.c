@@ -90,6 +90,7 @@ static char* get_pathname(const char* restrict suffix)
     goto fail;
   sprintf(rc, "%s/.coopgammad/~%s/%i%s%s%s",
 	  rundir, username, site.method, name ? "." : "", name ? name : "", suffix);
+  free(name);
   return rc;
   
  fail:
@@ -240,9 +241,9 @@ static int is_pidfile_reusable(const char* restrict pidpath, const char* restric
  */
 int create_pidfile(char* pidpath)
 {
-  int fd, r, saved_errno;
+  int fd = -1, r, saved_errno;
   char* p;
-  char* restrict token;
+  char* restrict token = NULL;
   
   /* Create token used to validate the service. */
   token = malloc(sizeof("COOPGAMMAD_PIDFILE_TOKEN=") + strlen(pidpath));
@@ -250,7 +251,7 @@ int create_pidfile(char* pidpath)
     return -1;
   sprintf(token, "COOPGAMMAD_PIDFILE_TOKEN=%s", pidpath);
   if (putenv(token))
-    return -1;
+    goto fail;
   
   /* Create PID file's directory. */
   for (p = pidpath; *p == '/'; p++);
@@ -259,7 +260,10 @@ int create_pidfile(char* pidpath)
       *p = '\0';
       if (mkdir(pidpath, 0755) < 0)
 	if (errno != EEXIST)
-	  return -1;
+	  {
+	    *p = '/';
+	    goto fail;
+	  }
       *p++ = '/';
     }
   
@@ -290,14 +294,19 @@ int create_pidfile(char* pidpath)
     goto fail;
   
   /* Done */
+  free(token);
   if (close(fd) < 0)
     if (errno != EINTR)
       return -1;
   return 0;
  fail:
   saved_errno = errno;
-  close(fd);
-  unlink(pidpath);
+  free(token);
+  if (fd >= 0)
+    {
+      close(fd);
+      unlink(pidpath);
+    }
   errno = saved_errno;
   return -1;
 }
