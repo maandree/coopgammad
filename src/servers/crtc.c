@@ -170,7 +170,7 @@ int merge_state(struct output* restrict old_outputs, size_t old_outputs_n)
 {
   struct output* restrict new_outputs = NULL;
   size_t new_outputs_n;
-  size_t i, j, k;
+  size_t i, j;
   
   /* How many outputs does the system now have? */
   i = j = new_outputs_n = 0;
@@ -193,7 +193,7 @@ int merge_state(struct output* restrict old_outputs, size_t old_outputs_n)
     }
   
   /* Merge output states */
-  i = j = k = new_outputs_n = 0;
+  i = j = new_outputs_n = 0;
   while ((i < old_outputs_n) && (j < outputs_n))
     {
       int is_same = 0, cmp = strcmp(old_outputs[i].name, outputs[j].name);
@@ -204,22 +204,23 @@ int merge_state(struct output* restrict old_outputs, size_t old_outputs_n)
 		   old_outputs[i].blue_size  == outputs[j].blue_size);
       if (is_same)
 	{
-	  new_outputs[k] = old_outputs[i];
-	  new_outputs[k].crtc = outputs[j].crtc;
+	  new_outputs[new_outputs_n] = old_outputs[i];
+	  new_outputs[new_outputs_n].crtc = outputs[j].crtc;
 	  memset(old_outputs + i, 0, sizeof(*old_outputs));
 	  outputs[j].crtc = NULL;
 	  output_destroy(outputs + j);
-	  k++;
+	  new_outputs_n++;
 	}
       else if (cmp <= 0)
-	new_outputs[k++] = outputs[j];
+	new_outputs[new_outputs_n++] = outputs[j];
       i += cmp >= 0;
       j += cmp <= 0;
     }
   while (j < outputs_n)
-    new_outputs[k++] = outputs[j++];
+    new_outputs[new_outputs_n++] = outputs[j++];
   
   /* Commit merge */
+  free(outputs);
   outputs   = new_outputs;
   outputs_n = new_outputs_n;
   
@@ -245,10 +246,8 @@ int disconnect(void)
     {
       outputs[i].crtc = NULL;
       libgamma_crtc_destroy(crtcs + i);
-      output_destroy(outputs + i);
     }
   free(crtcs), crtcs = NULL;
-  free(outputs), outputs = NULL;
   for (i = 0; i < site.partitions_available; i++)
     libgamma_partition_destroy(partitions + i);
   free(partitions), partitions = NULL;
@@ -266,13 +265,17 @@ int disconnect(void)
  */
 int reconnect(void)
 {
-  struct output* restrict old_outputs = NULL;
-  size_t i, old_outputs_n = 0;
+  struct output* restrict old_outputs;
+  size_t i, old_outputs_n;
   int saved_errno;
   
   if (connected)
     return 0;
   connected = 1;
+  
+  /* Remember old state */
+  old_outputs   = outputs,   outputs   = NULL;
+  old_outputs_n = outputs_n, outputs_n = 0;
   
   /* Get site */
   if (initialise_site() < 0)
@@ -299,8 +302,6 @@ int reconnect(void)
     goto fail;
   
   /* Merge state */
-  old_outputs   = outputs,   outputs   = NULL;
-  old_outputs_n = outputs_n, outputs_n = 0;
   if (merge_state(old_outputs, old_outputs_n) < 0)
     goto fail;
   for (i = 0; i < old_outputs_n; i++)

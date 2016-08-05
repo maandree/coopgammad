@@ -423,7 +423,7 @@ static void destroy(int full)
       disconnect_all();
       close_socket(socketpath);
       free(argv0_real);
-      if (outputs != NULL)
+      if ((outputs != NULL) && connected)
 	restore_gamma();
     }
   state_destroy();
