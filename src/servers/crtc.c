@@ -94,7 +94,7 @@ char* get_crtc_name(const libgamma_crtc_information_t* restrict info,
 /**
  * Initialise the site
  * 
- * @return   Zero on success, -1 on error
+ * @return  Zero on success, -1 on error
  */
 int initialise_site(void)
 {
@@ -121,7 +121,7 @@ int initialise_site(void)
 /**
  * Get partitions and CRTC:s
  * 
- * @return   Zero on success, -1 on error
+ * @return  Zero on success, -1 on error
  */
 int initialise_crtcs(void)
 {
