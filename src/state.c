@@ -298,6 +298,10 @@ size_t state_unmarshal(const void* restrict buf)
   outputs_n = *(const size_t*)(bs + off);
   off += sizeof(size_t);
   
+  outputs = calloc(outputs_n, sizeof(*outputs));
+  if (outputs == NULL)
+    return 0;
+  
   for (i = 0; i < outputs_n; i++)
     {
       off += n = output_unmarshal(outputs + i, bs + off);

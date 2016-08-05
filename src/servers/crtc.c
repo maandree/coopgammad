@@ -129,6 +129,7 @@ int initialise_crtcs(void)
   int gerror;
   
   /* Get partitions */
+  outputs_n = 0;
   if (site.partitions_available)
     if (!(partitions = calloc(site.partitions_available, sizeof(*partitions))))
       goto fail;
@@ -244,12 +245,15 @@ int disconnect(void)
     {
       outputs[i].crtc = NULL;
       libgamma_crtc_destroy(crtcs + i);
+      output_destroy(outputs + i);
     }
   free(crtcs), crtcs = NULL;
+  free(outputs), outputs = NULL;
   for (i = 0; i < site.partitions_available; i++)
     libgamma_partition_destroy(partitions + i);
   free(partitions), partitions = NULL;
   libgamma_site_destroy(&site);
+  memset(&site, 0, sizeof(site));
   
   return 0;
 }

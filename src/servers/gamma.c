@@ -356,6 +356,8 @@ void restore_gamma(void)
     {
       if (outputs[i].supported == LIBGAMMA_NO)
 	continue;
+      if (outputs[i].saved_ramps.u8.red == NULL)
+	continue;
       
       switch (outputs[i].depth)
 	{

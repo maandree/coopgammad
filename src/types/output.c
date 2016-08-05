@@ -254,6 +254,10 @@ size_t output_unmarshal(struct output* restrict this, const void* restrict buf)
   if (this->name == NULL)
     return 0;
   
+  this->saved_ramps.u8.red_size   = this->red_size;
+  this->saved_ramps.u8.green_size = this->green_size;
+  this->saved_ramps.u8.blue_size  = this->blue_size;
+  
   off += n = gamma_ramps_unmarshal(&(this->saved_ramps), bs, this->ramps_size);
   COPY_RAMP_SIZES(&(this->saved_ramps.u8), this);
   if (n == 0)
