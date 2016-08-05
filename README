@@ -78,6 +78,10 @@ SIGNALS
 	SIGUSR1
 		Reexecute the process to an updated version.
 
+	SIGUSR2
+	SIGINFO if available
+		Dump the process state to standard error.
+
 	SIGRTMIN+0
 		Disconnect from the display server or
 		graphics card.

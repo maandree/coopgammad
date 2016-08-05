@@ -128,7 +128,7 @@ static int dispatch_message(size_t conn, struct message* restrict msg)
  * 
  * @param   fds        Reference parameter for the array of file descriptors
  * @param   fdn        Output parameter for the number of file descriptors
- * @parma   fds_alloc  Reference parameter for the allocation size of `fds`, in elements
+ * @param   fds_alloc  Reference parameter for the allocation size of `fds`, in elements
  * @return             Zero on success, -1 on error
  */
 static int update_fdset(struct pollfd** restrict fds, nfds_t* restrict fdn, nfds_t* restrict fds_alloc)

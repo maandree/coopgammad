@@ -81,7 +81,7 @@ extern volatile sig_atomic_t terminate;
 /**
  * Has the process receive a to
  * disconnect from or reconnect to
- * the site? 1 if disconnct, 2 if
+ * the site? 1 if disconnect, 2 if
  * reconnect, 0 otherwise.
  */
 extern volatile sig_atomic_t connection;
@@ -157,6 +157,11 @@ extern libgamma_crtc_state_t* restrict crtcs;
 extern int preserve;
 
 
+
+/**
+ * Dump the state to stderr
+ */
+void state_dump(void);
 
 /**
  * Destroy the state

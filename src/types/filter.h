@@ -40,21 +40,21 @@
 enum lifespan
 {
   /**
+   * The filter should be removed now
+   */
+  LIFESPAN_REMOVE = 0,
+  
+  /**
    * The filter should be applied
    * until it is explicitly removed
    */
-  LIFESPAN_UNTIL_REMOVAL,
+  LIFESPAN_UNTIL_REMOVAL = 1,
   
   /**
    * The filter should be applied
    * until the client exists
    */
-  LIFESPAN_UNTIL_DEATH,
-  
-  /**
-   * The filter should be removed now
-   */
-  LIFESPAN_REMOVE
+  LIFESPAN_UNTIL_DEATH = 2
   
 };
 

@@ -153,6 +153,26 @@ static void sig_connection(int signo)
 }
 
 
+/**
+ * Called when the process receives
+ * a signal telling it to dump its
+ * state to stderr
+ * 
+ * @param  signo  The received signal
+ */
+static void sig_info(int signo)
+{
+  int saved_errno = errno;
+  char* env;
+  signal(signo, sig_info);
+  env = getenv("COOPGAMMAD_PIDFILE_TOKEN");
+  fprintf(stderr, "PID file token: %s\n", env ? env : "(null)");
+  fprintf(stderr, "PID file: %s\n", pidpath ? pidpath : "(null)");
+  fprintf(stderr, "Socket path: %s\n", socketpath ? socketpath : "(null)");
+  state_dump();
+  errno = saved_errno;
+}
+
 
 /**
  * Parse adjustment method name (or stringised number)
@@ -196,6 +216,10 @@ static int get_method(const char* restrict arg)
 static int set_up_signals(void)
 {
   if ((signal(SIGUSR1,      sig_reexec)     == SIG_ERR) ||
+      (signal(SIGUSR2,      sig_info)       == SIG_ERR) ||
+#if defined(SIGINFO)
+      (signal(SIGINFO,      sig_info)       == SIG_ERR) ||
+#endif
       (signal(SIGTERM,      sig_terminate)  == SIG_ERR) ||
       (signal(SIGRTMIN + 0, sig_connection) == SIG_ERR) ||
       (signal(SIGRTMIN + 1, sig_connection) == SIG_ERR))
@@ -740,6 +764,8 @@ static void usage(void)
  * The process closes stdout when the socket has been created
  * 
  * @signal  SIGUSR1     Re-execute to updated process image
+ * @signal  SIGUSR2     Dump the state of the process to standard error
+ * @signal  SIGINFO     Ditto
  * @signal  SIGTERM     Terminate the process gracefully
  * @signal  SIGRTMIN+0  Disconnect from the site
  * @signal  SiGRTMIN+1  Reconnect to the site

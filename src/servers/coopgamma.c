@@ -188,6 +188,10 @@ static ssize_t add_filter(struct output* restrict out, struct filter* restrict f
   memmove(out->table_sums    + i + 1, out->table_sums    + i, (n - i) * sizeof(*(out->table_sums)));
   out->table_size++;
   
+  out->table_filters[i] = *filter;
+  filter->class = NULL;
+  filter->ramps = NULL;
+  
   COPY_RAMP_SIZES(&(out->table_sums[i].u8), out);
   switch (out->depth)
     {
@@ -202,10 +206,6 @@ static ssize_t add_filter(struct output* restrict out, struct filter* restrict f
     }
   if (r < 0)
     return -1;
-  
-  out->table_filters[i] = *filter;
-  filter->class = NULL;
-  filter->ramps = NULL;
   
   return (ssize_t)i;
 }
