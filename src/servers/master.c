@@ -339,11 +339,13 @@ int main_loop(void)
       for (j = 0, i = 0; j < connections_used; j++)
 	if (connections[j] >= 0)
 	  {
+	    fds[i].revents = 0;
 	    if (ring_have_more(outbound + j))
 	      fds[(size_t)i++ + j].events |= POLLOUT;
 	    else
 	      fds[(size_t)i++ + j].events &= ~POLLOUT;
 	  }
+      fds[i].revents = 0;
       
       if (poll(fds, fdn, -1) < 0)
 	{
