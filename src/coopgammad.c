@@ -604,7 +604,7 @@ static char* reexecute(void)
       goto fail;
     }
   
-  fd = open(statefile, O_CREAT, S_IRUSR | S_IWUSR);
+  fd = open(statefile, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
   if (fd < 0)
     goto fail;
   
