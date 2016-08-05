@@ -253,6 +253,7 @@ size_t output_unmarshal(struct output* restrict this, const void* restrict buf)
   this->name = memdup(bs + off, n);
   if (this->name == NULL)
     return 0;
+  off += n;
   
   this->saved_ramps.u8.red_size   = this->red_size;
   this->saved_ramps.u8.green_size = this->green_size;
