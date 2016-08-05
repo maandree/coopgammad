@@ -558,6 +558,7 @@ static int restore_state(const char* restrict statefile)
       errno = 0;
       goto fail;
     }
+  free(marshalled), marshalled = NULL;
   
   if (connected)
     {
@@ -776,6 +777,7 @@ int main(int argc, char** argv)
 {
   int rc = 1, foreground = 0, keep_stderr = 0, query = 0, r;
   char* statefile = NULL;
+  char* statefile_ = NULL;
   
   ARGBEGIN
     {
@@ -796,7 +798,7 @@ int main(int argc, char** argv)
     case 'k':  keep_stderr = 1;      break;
     case 'q':  query = 1 + !!query;  break;
     case ' ': /* Internal, do not document */
-      statefile = EARGF(usage());
+      statefile = statefile_ = EARGF(usage());
       break;
     default:
       usage();
@@ -819,10 +821,9 @@ int main(int argc, char** argv)
     goto fail;
   else
     {
-      if (reexec)
+      if (statefile != statefile_)
 	free(statefile);
       unlink(statefile), statefile = NULL;
-      reexec = 0; /* See `if (reexec && !terminate)` below */
     }
   
   if (query)
@@ -842,8 +843,7 @@ int main(int argc, char** argv)
 	{
 	  perror(argv0);
 	  fprintf(stderr, "%s: restoring state without re-executing\n", argv0);
-	  /* `reexec = 0;` is done later in case of re-execute failure,
-	   * since it determines whether `statefile` shall be freed. */
+	  reexec = 0;
 	  goto restart;
 	}
       perror(argv0);

@@ -52,13 +52,13 @@ static char* get_pathname(const char* restrict suffix)
   size_t n;
   int saved_errno;
   
-  if (site.site)
+  if (sitename)
     {
-      name = memdup(site.site, strlen(site.site) + 1);
+      name = memdup(sitename, strlen(sitename) + 1);
       if (name == NULL)
 	goto fail;
     }
-  else if ((name = libgamma_method_default_site(site.method)))
+  else if ((name = libgamma_method_default_site(method)))
     {
       name = memdup(name, strlen(name) + 1);
       if (name == NULL)
@@ -66,7 +66,7 @@ static char* get_pathname(const char* restrict suffix)
     }
   
   if (name != NULL)
-    switch (site.method)
+    switch (method)
       {
       case LIBGAMMA_METHOD_X_RANDR:
       case LIBGAMMA_METHOD_X_VIDMODE:
@@ -89,7 +89,7 @@ static char* get_pathname(const char* restrict suffix)
   if (!(rc = malloc(n)))
     goto fail;
   sprintf(rc, "%s/.coopgammad/~%s/%i%s%s%s",
-	  rundir, username, site.method, name ? "." : "", name ? name : "", suffix);
+	  rundir, username, method, name ? "." : "", name ? name : "", suffix);
   free(name);
   return rc;
   

@@ -286,7 +286,6 @@ size_t state_unmarshal(const void* restrict buf)
   
   if (*(bs + off))
     {
-      off += 1;
       n = strlen(bs + off) + 1;
       if (!(argv0_real = memdup(bs + off, n)))
 	return 0;
