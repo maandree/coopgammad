@@ -118,7 +118,7 @@ char* restrict socketpath = NULL;
 static void sig_reexec(int signo)
 {
   reexec = 1;
-  (void) signo;
+  signal(signo, sig_reexec);
 }
 
 
