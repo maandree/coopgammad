@@ -117,8 +117,10 @@ char* restrict socketpath = NULL;
  */
 static void sig_reexec(int signo)
 {
+  int saved_errno = errno;
   reexec = 1;
   signal(signo, sig_reexec);
+  errno = saved_errno;
 }
 
 
@@ -144,8 +146,10 @@ static void sig_terminate(int signo)
  */
 static void sig_connection(int signo)
 {
+  int saved_errno = errno;
   connection = signo - SIGRTMIN + 1;
   signal(signo, sig_connection);
+  errno = saved_errno;
 }
 
 
