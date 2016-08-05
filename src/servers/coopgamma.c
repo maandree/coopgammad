@@ -228,6 +228,11 @@ int connection_closed(int client)
       ssize_t updated = -1;
       for (j = k = 0; j < output->table_size; j += !remove, k++)
 	{
+	  if (j != k)
+	    {
+	      output->table_filters[j] = output->table_filters[k];
+	      output->table_sums[j]    = output->table_sums[k];
+	    }
 	  remove = output->table_filters[j].client == client;
 	  remove = remove && (output->table_filters[j].lifespan == LIFESPAN_UNTIL_DEATH);
 	  if (remove)
@@ -238,8 +243,6 @@ int connection_closed(int client)
 	      if (updated == -1)
 		updated = (ssize_t)j;
 	    }
-	  output->table_filters[j] = output->table_filters[k];
-	  output->table_sums[j]    = output->table_sums[k];
 	}
       if (updated >= 0)
 	if (flush_filters(output, (size_t)updated) < 0)
