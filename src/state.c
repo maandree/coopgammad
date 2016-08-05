@@ -172,7 +172,6 @@ void state_destroy(void)
   free(partitions);
   libgamma_site_destroy(&site);
   
-  free(argv0_real);
   free(sitename);
 }
 

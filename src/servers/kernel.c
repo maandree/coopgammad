@@ -197,6 +197,7 @@ static int is_pidfile_reusable(const char* restrict pidpath, const char* restric
   sprintf(temp, "%llu\n", (unsigned long long)pid);
   if (strcmp(content, temp))
     goto bad;
+  free(content);
   
   /* Validate PID */
 #if defined(HAVE_LINUX_PROCFS)
@@ -211,7 +212,8 @@ static int is_pidfile_reusable(const char* restrict pidpath, const char* restric
   
   for (end = (p = content) + n; p != end; p = strchr(p, '\0') + 1)
     if (!strcmp(p, token))
-      return 0;
+      return free(content), 0;
+  free(content);
 #else
   if ((kill(pid, 0) == 0) || (errno == EINVAL))
     return 0;
@@ -250,8 +252,20 @@ int create_pidfile(char* pidpath)
   if (token == NULL)
     return -1;
   sprintf(token, "COOPGAMMAD_PIDFILE_TOKEN=%s", pidpath);
+#if !defined(USE_VALGRIND)
   if (putenv(token))
-    goto fail;
+    goto putenv_fail;
+  /* `token` must not be free! */
+#else
+  {
+    static char static_token[sizeof("COOPGAMMAD_PIDFILE_TOKEN=") + PATH_MAX];
+    if (strlen(pidpath) > PATH_MAX)
+      abort();
+    strcpy(static_token, token);
+    if (putenv(static_token))
+      goto fail;
+  }
+#endif
   
   /* Create PID file's directory. */
   for (p = pidpath; *p == '/'; p++);
@@ -294,14 +308,24 @@ int create_pidfile(char* pidpath)
     goto fail;
   
   /* Done */
+#if defined(USE_VALGRIND)
   free(token);
+#endif
   if (close(fd) < 0)
     if (errno != EINTR)
       return -1;
   return 0;
- fail:
+#if !defined(USE_VALGRIND)
+ putenv_fail:
   saved_errno = errno;
   free(token);
+  errno = saved_errno;
+#endif
+ fail:
+  saved_errno = errno;
+#if defined(USE_VALGRIND)
+  free(token);
+#endif
   if (fd >= 0)
     {
       close(fd);

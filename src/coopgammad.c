@@ -419,14 +419,13 @@ static enum init_status initialise(int foreground, int keep_stderr, int query)
 static void destroy(int full)
 {
   if (full)
-    disconnect_all();
-  
-  if (full)
-    close_socket(socketpath);
-  
-  if (full && (outputs != NULL))
-    restore_gamma();
-  
+    {
+      disconnect_all();
+      close_socket(socketpath);
+      free(argv0_real);
+      if (outputs != NULL)
+	restore_gamma();
+    }
   state_destroy();
   free(socketpath);
   if (full && (pidpath != NULL))
@@ -618,7 +617,11 @@ static char* reexecute(void)
   
   destroy(0);
   
+#if !defined(USE_VALGRIND)
   execlp(argv0_real ? argv0_real : argv0, argv0, "- ", statefile, NULL);
+#else
+  execlp("valgrind", "valgrind", "--leak-check=full", argv0_real ? argv0_real : argv0, "- ", statefile, NULL);
+#endif
   saved_errno = errno;
   free(argv0_real), argv0_real = NULL;
   errno = saved_errno;
