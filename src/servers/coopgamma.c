@@ -157,6 +157,8 @@ static ssize_t add_filter(struct output* restrict out, struct filter* restrict f
     {
       filter_destroy(out->table_filters + i);
       out->table_filters[i] = *filter;
+      filter->class = NULL;
+      filter->ramps = NULL;
       return (ssize_t)i;
     }
   
@@ -202,6 +204,8 @@ static ssize_t add_filter(struct output* restrict out, struct filter* restrict f
     return -1;
   
   out->table_filters[i] = *filter;
+  filter->class = NULL;
+  filter->ramps = NULL;
   
   return (ssize_t)i;
 }
@@ -455,11 +459,11 @@ int handle_set_gamma(size_t conn, const char* restrict message_id, const char* r
   
   if ((r = add_filter(output, &filter)) < 0)
     goto fail;
-  filter.class = NULL;
-  filter.ramps = NULL;
   if (flush_filters(output, (size_t)r))
     goto fail;
   
+  free(filter.class);
+  free(filter.ramps);
   return send_errno(0);
   
  fail:
