@@ -316,6 +316,10 @@ void store_gamma(void)
       if (outputs[i].supported == LIBGAMMA_NO)
 	continue;
       
+      outputs[i].saved_ramps.u8.red_size   = outputs[i].red_size;
+      outputs[i].saved_ramps.u8.green_size = outputs[i].green_size;
+      outputs[i].saved_ramps.u8.blue_size  = outputs[i].blue_size;
+      
       switch (outputs[i].depth)
 	{
 	case 64:  LOAD_RAMPS(64, u64);  break;
