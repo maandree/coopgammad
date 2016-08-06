@@ -8,6 +8,7 @@ BUILD DEPENDENCIES:
 
 	libc
 	libgamma
+	libclut
 	cc
 	make
 	coreutils
