@@ -54,9 +54,11 @@ int send_message(size_t conn, char* restrict buf, size_t n)
       while (old_ptr < n)
 	{
 	  sendsize = old_n - old_ptr < chunksize ? old_n - old_ptr : chunksize;
-	  sent = send(fd, old_buf + old_ptr, sendsize, 0);
+	  sent = send(fd, old_buf + old_ptr, sendsize, MSG_NOSIGNAL);
 	  if (sent < 0)
 	    {
+	      if (errno == EPIPE)
+		errno = ECONNRESET;
 	      if (errno != EMSGSIZE)
 		goto fail;
 	      chunksize >>= 1;
@@ -72,9 +74,11 @@ int send_message(size_t conn, char* restrict buf, size_t n)
   while (ptr < n)
     {
       sendsize = n - ptr < chunksize ? n - ptr : chunksize;
-      sent = send(fd, buf + ptr, sendsize, 0);
+      sent = send(fd, buf + ptr, sendsize, MSG_NOSIGNAL);
       if (sent < 0)
 	{
+	  if (errno == EPIPE)
+	    errno = ECONNRESET;
 	  if (errno != EMSGSIZE)
 	    goto fail;
 	  chunksize >>= 1;
