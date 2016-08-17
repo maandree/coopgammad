@@ -342,8 +342,8 @@ int handle_get_gamma(size_t conn, const char* restrict message_id, const char* r
   
   if (coal)
     {
-      if (start == 0)
-	memcpy(buf + n, output->table_sums[end].u8.red, output->ramps_size);
+      if ((start == 0) && (start < end))
+	memcpy(buf + n, output->table_sums[end - 1].u8.red, output->ramps_size);
       else
 	{
 	  union gamma_ramps ramps;
