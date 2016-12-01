@@ -108,6 +108,7 @@ int initialise_site(void)
   
   return 0;
  fail_libgamma:
+  sitename_dup = NULL;
   libgamma_perror(argv0, gerror);
   errno = 0;
  fail:
