@@ -2,7 +2,7 @@
 .SH "NAME"
 coopgammad - Cooperative gamma server
 .SH "SYNPOSIS"
-.B coopgamma
+.B coopgammad
 .RB [ -m
 .IR method ]
 .RB [ -s
@@ -40,15 +40,16 @@ background.
 \fB-m\fP \fIMETHOD\fP
 Adjustment method name or number. Recognised
 names include:
-
-.nf
-\fBdummy\fP      Dummy method
-\fBrandr\fP      X RAndR
-\fBvidmode\fP    X VidMode
-\fBdrm\fP        Linux DRM
-\fBgdi\fP        Windows GDI
-\fBquartz\fP     Quartz Core Graphics
-.fi
+.TS
+tab(:);
+l l.
+\fBdummy\fP:Dummy method
+\fBrandr\fP:X RAndR
+\fBvidmode\fP:X VidMode
+\fBdrm\fP:Linux DRM
+\fBgdi\fP:Windows GDI
+\fBquartz\fP:Quartz Core Graphics
+.TE
 
 The adjustment methods are supported via
 .BR libgamma (7).
