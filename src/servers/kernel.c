@@ -85,7 +85,7 @@ static char* get_pathname(const char* restrict suffix)
     username = pw->pw_name ? pw->pw_name : "";
   
   n = sizeof("/.coopgammad/~/.") + 3 * sizeof(int);
-  n += strlen(rundir) + strlen(username) + strlen(name) + strlen(suffix);
+  n += strlen(rundir) + strlen(username) + ((name != NULL) ? strlen(name) : 0) + strlen(suffix);
   if (!(rc = malloc(n)))
     goto fail;
   sprintf(rc, "%s/.coopgammad/~%s/%i%s%s%s",
