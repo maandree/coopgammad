@@ -100,4 +100,4 @@ RATIONALE
 
 SEE ALSO
 	libcoopgamma(7), cg-tools(7), libgamma(7),
-	blueshift(1), mds-coopgamma(1).
+	blueshift(1), radharc(1), mds-coopgamma(1).

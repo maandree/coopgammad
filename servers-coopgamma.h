@@ -1,39 +1,18 @@
-/**
- * coopgammad -- Cooperative gamma server
- * Copyright (C) 2016  Mattias Andrée (maandree@kth.se)
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+/* See LICENSE file for copyright and license details. */
 #ifndef SERVERS_COOPGAMMA_H
 #define SERVERS_COOPGAMMA_H
 
-
-#include "../types/output.h"
+#include "types-output.h"
 
 #include <stddef.h>
 
-
-
 #ifndef GCC_ONLY
 # if defined(__GNUC__) && !defined(__clang__)
-#  define GCC_ONLY(...)  __VA_ARGS__
+#  define GCC_ONLY(...) __VA_ARGS__
 # else
-#  define GCC_ONLY(...)  /* nothing */
+#  define GCC_ONLY(...) /* nothing */
 # endif
 #endif
-
-
 
 /**
  * Handle a closed connection
@@ -55,10 +34,10 @@ int connection_closed(int client);
  * @return                 Zero on success (even if ignored), -1 on error,
  *                         1 if connection closed
  */
-GCC_ONLY(__attribute__((nonnull(2))))
-int handle_get_gamma(size_t conn, const char* restrict message_id, const char* restrict crtc,
-		     const char* restrict coalesce, const char* restrict high_priority,
-		     const char* restrict low_priority);
+GCC_ONLY(__attribute__((__nonnull__(2))))
+int handle_get_gamma(size_t conn, const char *restrict message_id, const char *restrict crtc,
+                     const char *restrict coalesce, const char *restrict high_priority,
+                     const char *restrict low_priority);
 
 /**
  * Handle a ‘Command: set-gamma’ message
@@ -72,10 +51,9 @@ int handle_get_gamma(size_t conn, const char* restrict message_id, const char* r
  * @return              Zero on success (even if ignored), -1 on error,
  *                      1 if connection closed
  */
-GCC_ONLY(__attribute__((nonnull(2))))
-int handle_set_gamma(size_t conn, const char* restrict message_id, const char* restrict crtc,
-		     const char* restrict priority, const char* restrict class, const char* restrict lifespan);
-
+GCC_ONLY(__attribute__((__nonnull__(2))))
+int handle_set_gamma(size_t conn, const char *restrict message_id, const char *restrict crtc,
+                     const char *restrict priority, const char *restrict class, const char *restrict lifespan);
 
 /**
  * Recalculate the resulting gamma and
@@ -85,9 +63,8 @@ int handle_set_gamma(size_t conn, const char* restrict message_id, const char* r
  * @param   first_updated  The index of the first added or removed filter
  * @return                 Zero on success, -1 on error
  */
-GCC_ONLY(__attribute__((nonnull)))
-int flush_filters(struct output* restrict output, size_t first_updated);
-
+GCC_ONLY(__attribute__((__nonnull__)))
+int flush_filters(struct output *restrict output, size_t first_updated);
 
 /**
  * Preserve current gamma ramps at priority 0 for all outputs
@@ -96,6 +73,4 @@ int flush_filters(struct output* restrict output, size_t first_updated);
  */
 int preserve_gamma(void);
 
-
 #endif
-

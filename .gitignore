@@ -1,5 +1,3 @@
-bin/
-obj/
 \#*\#
 .\#*
 *~
@@ -13,3 +11,4 @@ obj/
 *.dvi
 *.ps
 *.info
+/coopgammad

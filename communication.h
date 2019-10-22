@@ -1,38 +1,17 @@
-/**
- * coopgammad -- Cooperative gamma server
- * Copyright (C) 2016  Mattias Andrée (maandree@kth.se)
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+/* See LICENSE file for copyright and license details. */
 #ifndef COMMUNICATION_H
 #define COMMUNICATION_H
-
 
 #include <stdio.h>
 #include <stdlib.h>
 
-
-
 #ifndef GCC_ONLY
 # if defined(__GNUC__) && !defined(__clang__)
-#  define GCC_ONLY(...)  __VA_ARGS__
+#  define GCC_ONLY(...) __VA_ARGS__
 # else
-#  define GCC_ONLY(...)  /* nothing */
+#  define GCC_ONLY(...) /* nothing */
 # endif
 #endif
-
-
 
 /**
  * Construct a message
@@ -43,18 +22,16 @@
  * @param  format:string-literal  Message format string
  * @param  ...                    Message formatting arguments
  */
-#define MAKE_MESSAGE(bufp, np, extra, format, ...)			\
-  do									\
-    {									\
-      ssize_t m__;							\
-      snprintf(NULL, 0, format "%zn", __VA_ARGS__, &m__);		\
-      *(bufp) = malloc((size_t)(extra) + (size_t)m__ + (size_t)1);	\
-      if (*(bufp) == NULL)						\
-	return -1;							\
-      sprintf(*(bufp), format, __VA_ARGS__);				\
-      *(np) = (size_t)m__;						\
-    }									\
-  while (0)
+#define MAKE_MESSAGE(bufp, np, extra, format, ...)\
+	do {\
+		ssize_t m__;\
+		snprintf(NULL, 0, format "%zn", __VA_ARGS__, &m__);\
+		*(bufp) = malloc((size_t)(extra) + (size_t)m__ + (size_t)1);\
+		if (!*(bufp))\
+			return -1;\
+		sprintf(*(bufp), format, __VA_ARGS__);\
+		*(np) = (size_t)m__;\
+	} while (0)
 
 /**
  * Send a custom error without an error number
@@ -64,7 +41,7 @@
  *               0: Success (possibily delayed)
  *               -1: An error occurred
  */
-#define send_error(...)  ((send_error)(conn, message_id, __VA_ARGS__))
+#define send_error(...) ((send_error)(conn, message_id, __VA_ARGS__))
 
 /**
  * Send a standard error
@@ -74,9 +51,7 @@
  *               0: Success (possibily delayed)
  *               -1: An error occurred
  */
-#define send_errno(...)  ((send_errno)(conn, message_id, __VA_ARGS__))
-
-
+#define send_errno(...) ((send_errno)(conn, message_id, __VA_ARGS__))
 
 /**
  * Send a message
@@ -89,7 +64,7 @@
  *                as success (ECONNRESET cause 1 to be returned),
  *                and are handled appropriately.
  */
-int send_message(size_t conn, char* restrict buf, size_t n);
+int send_message(size_t conn, char *restrict buf, size_t n);
 
 /**
  * Send a custom error without an error number
@@ -101,8 +76,8 @@ int send_message(size_t conn, char* restrict buf, size_t n);
  *                      0: Success (possibily delayed)
  *                      -1: An error occurred
  */
-GCC_ONLY(__attribute__((nonnull)))
-int (send_error)(size_t conn, const char* restrict message_id, const char* restrict desc);
+GCC_ONLY(__attribute__((__nonnull__)))
+int (send_error)(size_t conn, const char *restrict message_id, const char *restrict desc);
 
 /**
  * Send a standard error
@@ -114,8 +89,8 @@ int (send_error)(size_t conn, const char* restrict message_id, const char* restr
  *                      0: Success (possibily delayed)
  *                      -1: An error occurred
  */
-GCC_ONLY(__attribute__((nonnull)))
-int (send_errno)(size_t conn, const char* restrict message_id, int number);
+GCC_ONLY(__attribute__((__nonnull__)))
+int (send_errno)(size_t conn, const char *restrict message_id, int number);
 
 /**
  * Continue sending the queued messages
@@ -126,12 +101,10 @@ int (send_errno)(size_t conn, const char* restrict message_id, int number);
  *                as success (ECONNRESET cause 1 to be returned),
  *                and are handled appropriately.
  */
-static inline int continue_send(size_t conn)
+static inline int
+continue_send(size_t conn)
 {
-  return send_message(conn, NULL, 0);
+	return send_message(conn, NULL, 0);
 }
 
-
-
 #endif
-
