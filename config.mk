@@ -5,8 +5,8 @@ MANPREFIX = $(PREFIX)/share/man
 PKGNAME = coopgammad
 COMMAND = coopgammad
 
-CPPFLAGS = -D_XOPEN_SOURCE=700 -DUSE_VALGRIND
-#CFLAGS   = -std=c99 -Wall -O2
-#LDFLAGS  = -lgamma -s
-CFLAGS   = -std=c99 -Wall -Og -g
-LDFLAGS  = -lgamma
+CC=cc
+
+CPPFLAGS = -D_XOPEN_SOURCE=700 -D_GNU_SOURCE -DUSE_VALGRIND
+CFLAGS   = -std=c11 -Wall -Og
+LDFLAGS  = -lgamma -s
