@@ -33,7 +33,7 @@ int handle_enumerate_crtcs(size_t conn, const char *restrict message_id);
  * @return        The name of the CRTC, `NULL` on error
  */
 GCC_ONLY(__attribute__((__nonnull__)))
-char *get_crtc_name(const libgamma_crtc_information_t *restrict info, const libgamma_crtc_state_t *restrict crtc);
+char *get_crtc_name(const struct libgamma_crtc_information *restrict info, const struct libgamma_crtc_state *restrict crtc);
 
 /**
  * Initialise the site

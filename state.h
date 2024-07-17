@@ -118,17 +118,17 @@ extern char *restrict sitename;
 /**
  * The libgamma site state
  */
-extern libgamma_site_state_t site;
+extern struct libgamma_site_state site;
 
 /**
  * The libgamma partition states
  */
-extern libgamma_partition_state_t *restrict partitions;
+extern struct libgamma_partition_state *restrict partitions;
 
 /**
  * The libgamma CRTC states
  */
-extern libgamma_crtc_state_t *restrict crtcs;
+extern struct libgamma_crtc_state *restrict crtcs;
 
 /**
  * Preserve gamma ramps at priority 0?

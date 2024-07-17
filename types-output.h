@@ -184,7 +184,7 @@ struct output {
 	/**
 	 * The libgamma state for the output
 	 */
-	libgamma_crtc_state_t *restrict crtc;
+	struct libgamma_crtc_state *restrict crtc;
 
 	/**
 	 * Saved gamma ramps

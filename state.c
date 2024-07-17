@@ -107,17 +107,17 @@ char *restrict sitename = NULL;
 /**
  * The libgamma site state
  */
-libgamma_site_state_t site; /* do not marshal */
+struct libgamma_site_state site; /* do not marshal */
 
 /**
  * The libgamma partition states
  */
-libgamma_partition_state_t *restrict partitions = NULL; /* do not marshal */
+struct libgamma_partition_state *restrict partitions = NULL; /* do not marshal */
 
 /**
  * The libgamma CRTC states
  */
-libgamma_crtc_state_t *restrict crtcs = NULL; /* do not marshal */
+struct libgamma_crtc_state *restrict crtcs = NULL; /* do not marshal */
 
 /**
  * Preserve gamma ramps at priority 0?

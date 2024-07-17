@@ -664,6 +664,7 @@ static int
 print_method_and_site(int query)
 {
 	const char *restrict methodname = NULL;
+	const char *const_sitename;
 	char *p;
 
 	if (query == 1) {
@@ -682,8 +683,8 @@ print_method_and_site(int query)
 	}
 
 	if (!sitename)
-		if ((sitename = libgamma_method_default_site(method)))
-			if (!(sitename = memdup(sitename, strlen(sitename) + 1)))
+		if ((const_sitename = libgamma_method_default_site(method)))
+			if (!(sitename = memdup(const_sitename, strlen(const_sitename) + 1)))
 				return -1;
 
 	if (sitename) {

@@ -1,13 +1,13 @@
 RUNTIME DEPENDENCIES:
 
 	libc
-	libgamma
+	libgamma>=0.7.4
 
 
 BUILD DEPENDENCIES:
 
 	libc
-	libgamma
+	libgamma>=0.7.4
 	libclut
 	cc
 	make

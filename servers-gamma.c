@@ -120,12 +120,12 @@ set_gamma(const struct output *restrict output, const union gamma_ramps *restric
 		return;
 
 	switch (output->depth) {
-	case  8: r = libgamma_crtc_set_gamma_ramps8(output->crtc,  ramps->u8);  break;
-	case 16: r = libgamma_crtc_set_gamma_ramps16(output->crtc, ramps->u16); break;
-	case 32: r = libgamma_crtc_set_gamma_ramps32(output->crtc, ramps->u32); break;
-	case 64: r = libgamma_crtc_set_gamma_ramps64(output->crtc, ramps->u64); break;
-	case -1: r = libgamma_crtc_set_gamma_rampsf(output->crtc,  ramps->f);   break;
-	case -2: r = libgamma_crtc_set_gamma_rampsd(output->crtc,  ramps->d);   break;
+	case  8: r = libgamma_crtc_set_gamma_ramps8(output->crtc,  &ramps->u8);  break;
+	case 16: r = libgamma_crtc_set_gamma_ramps16(output->crtc, &ramps->u16); break;
+	case 32: r = libgamma_crtc_set_gamma_ramps32(output->crtc, &ramps->u32); break;
+	case 64: r = libgamma_crtc_set_gamma_ramps64(output->crtc, &ramps->u64); break;
+	case -1: r = libgamma_crtc_set_gamma_rampsf(output->crtc,  &ramps->f);   break;
+	case -2: r = libgamma_crtc_set_gamma_rampsd(output->crtc,  &ramps->d);   break;
 	default:
 		abort();
 	}
@@ -224,12 +224,12 @@ parse_edid(struct output *restrict output, const unsigned char *restrict edid, s
 int
 initialise_gamma_info(void)
 {
-	libgamma_crtc_information_t info;
+	struct libgamma_crtc_information info;
 	int saved_errno;
 	size_t i;
 
 	for (i = 0; i < outputs_n; i++) {
-		libgamma_get_crtc_information(&info, crtcs + i,
+		libgamma_get_crtc_information(&info, sizeof(info), &crtcs[i],
 		                              LIBGAMMA_CRTC_INFO_EDID |
 		                              LIBGAMMA_CRTC_INFO_MACRO_RAMP |
 		                              LIBGAMMA_CRTC_INFO_GAMMA_SUPPORT |
@@ -334,7 +334,7 @@ restore_gamma(void)
 #define RESTORE_RAMPS(SUFFIX, MEMBER)\
 	do {\
 		if (outputs[i].saved_ramps.MEMBER.red) {\
-			gerror = libgamma_crtc_set_gamma_ramps##SUFFIX(outputs[i].crtc, outputs[i].saved_ramps.MEMBER);\
+			gerror = libgamma_crtc_set_gamma_ramps##SUFFIX(outputs[i].crtc, &outputs[i].saved_ramps.MEMBER);\
 			if (gerror)\
 				libgamma_perror(argv0, gerror);\
 		}\

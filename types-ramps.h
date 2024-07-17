@@ -20,32 +20,32 @@ union gamma_ramps {
 	/**
 	 * Ramps with 8-bit value
 	 */
-	libgamma_gamma_ramps8_t u8;
+	struct libgamma_gamma_ramps8 u8;
 
 	/**
 	 * Ramps with 16-bit value
 	 */
-	libgamma_gamma_ramps16_t u16;
+	struct libgamma_gamma_ramps16 u16;
 
 	/**
 	 * Ramps with 32-bit value
 	 */
-	libgamma_gamma_ramps32_t u32;
+	struct libgamma_gamma_ramps32 u32;
 
 	/**
 	 * Ramps with 64-bit value
 	 */
-	libgamma_gamma_ramps64_t u64;
+	struct libgamma_gamma_ramps64 u64;
 
 	/**
 	 * Ramps with `float` value
 	 */
-	libgamma_gamma_rampsf_t f;
+	struct libgamma_gamma_rampsf f;
 
 	/**
 	 * Ramps with `double` value
 	 */
-	libgamma_gamma_rampsd_t d;
+	struct libgamma_gamma_rampsd d;
 };
 
 /**
