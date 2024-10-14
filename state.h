@@ -6,10 +6,10 @@
 #include "types-ring.h"
 #include "types-output.h"
 
-#include <libgamma.h>
-
 #include <stddef.h>
 #include <signal.h>
+
+#include <libgamma.h>
 
 #ifndef GCC_ONLY
 # if defined(__GNUC__) && !defined(__clang__)

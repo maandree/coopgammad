@@ -6,12 +6,12 @@
 #include "util.h"
 #include "types-output.h"
 
-#include <libclut.h>
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <libclut.h>
 
 
 /**

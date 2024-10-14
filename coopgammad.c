@@ -166,7 +166,7 @@ GCC_ONLY(__attribute__((__nonnull__)))
 static int
 get_method(const char *restrict arg)
 {
-#if LIBGAMMA_METHOD_MAX > 5
+#if LIBGAMMA_METHOD_COUNT > 6
 # warning libgamma has added more adjustment methods
 #endif
 
@@ -278,7 +278,7 @@ daemonise(int keep_stderr)
 	fd = open(pidpath, O_WRONLY);
 	if (fd < 0)
 		goto fail;
-	if (dprintf(fd, "%llu\n", (unsigned long long)getpid()) < 0)
+	if (dprintf(fd, "%llu\n", (unsigned long long int)getpid()) < 0)
 		goto fail;
 	close(fd);
 	fd = -1;

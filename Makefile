@@ -20,12 +20,12 @@ PARTS =\
 	types-message\
 	types-ring
 
-OBJ = $(PARTS:=.o) coopgammad.c
+OBJ = $(PARTS:=.o) coopgammad.o
 
 HDR = $(PARTS:=.h) arg.h
 
 all: coopgammad
-$(OBJ): $(@:.o=.c) $(HDR)
+$(OBJ): $(HDR)
 
 .c.o:
 	$(CC) -c -o $@ $< $(XCPPFLAGS) $(CPPFLAGS) $(CFLAGS)

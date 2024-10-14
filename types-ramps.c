@@ -1,11 +1,11 @@
 /* See LICENSE file for copyright and license details. */
 #include "types-ramps.h"
 
-#include <libclut.h>
-
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <libclut.h>
 
 
 /**

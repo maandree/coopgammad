@@ -3,8 +3,6 @@
 #include "state.h"
 #include "util.h"
 
-#include <libgamma.h>
-
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -15,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include <libgamma.h>
 
 
 /**
@@ -29,6 +29,7 @@ get_pathname(const char *restrict suffix)
 {
 	const char *restrict rundir = getenv("XDG_RUNTIME_DIR");
 	const char *restrict username = "";
+	const char *const_name;
 	char *name = NULL;
 	char *p;
 	char *restrict rc;
@@ -39,8 +40,8 @@ get_pathname(const char *restrict suffix)
 		name = memdup(sitename, strlen(sitename) + 1);
 		if (!name)
 			goto fail;
-	} else if ((name = libgamma_method_default_site(method))) {
-		name = memdup(name, strlen(name) + 1);
+	} else if ((const_name = libgamma_method_default_site(method))) {
+		name = memdup(const_name, strlen(const_name) + 1);
 		if (!name)
 			goto fail;
 	}
@@ -176,7 +177,7 @@ retry:
 		goto bad;
 	if ((size_t)(p - content) != n)
 		goto bad;
-	sprintf(temp, "%llu\n", (unsigned long long)pid);
+	sprintf(temp, "%llu\n", (unsigned long long int)pid);
 	if (strcmp(content, temp))
 		goto bad;
 	free(content);
