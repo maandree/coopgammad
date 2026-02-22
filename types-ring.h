@@ -94,7 +94,7 @@ GCC_ONLY(__attribute__((__nonnull__)))
 void *ring_peek(struct ring *restrict this, size_t *restrict n);
 
 /**
- * Dequeue data from a ring bubber
+ * Dequeue data from a ring buffer
  * 
  * @param  this  The ring buffer
  * @param  n     The number of bytes to dequeue

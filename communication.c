@@ -14,7 +14,7 @@
  * @param   conn  The index of the connection
  * @param   buf   The data to send
  * @param   n     The size of `buf`
- * @return        Zero on success, -1 on error, 1 if disconncted
+ * @return        Zero on success, -1 on error, 1 if disconnected
  *                EINTR, EAGAIN, EWOULDBLOCK, and ECONNRESET count
  *                as success (ECONNRESET cause 1 to be returned),
  *                and are handled appropriately.
@@ -110,7 +110,7 @@ proper_fail:
  * @param   message_id  The ID of the message to which this message is a response
  * @param   desc        The error description to send
  * @return              1: Client disconnected
- *                      0: Success (possibily delayed)
+ *                      0: Success (possibly delayed)
  *                      -1: An error occurred
  */
 int
@@ -139,7 +139,7 @@ int
  * @param   message_id  The ID of the message to which this message is a response
  * @param   number      The value of `errno`, 0 to indicate success
  * @return              1: Client disconnected
- *                      0: Success (possibily delayed)
+ *                      0: Success (possibly delayed)
  *                      -1: An error occurred
  */
 int

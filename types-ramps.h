@@ -14,7 +14,7 @@
 
 /**
  * Gamma ramps union for all
- * lbigamma gamma ramps types
+ * libgamma gamma ramps types
  */
 union gamma_ramps {
 	/**

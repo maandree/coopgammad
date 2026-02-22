@@ -23,7 +23,7 @@ OPTIONS
 	-f
 		Don't fork the process to the background.
 		If used, you can still detect when the
-		process has been initialised be waiting
+		process has been initialised by waiting
 		for its stdout to close.
 
 	-k
@@ -43,7 +43,7 @@ OPTIONS
 
 		The adjustment methods are supported via
 		libgamma(7). Only methods that were enabled
-		when libgamma as compiled will be supported.
+		when libgamma was compiled will be supported.
 
 	-p
 		Add the current gamma adjustments to the
@@ -59,10 +59,10 @@ OPTIONS
 		the name of the selected site on the second
 		line to stdout. The second line can be omitted
 		if -s has not been used and the default site
-		cannot be find.
+		cannot be found.
 
 		If used at least twice, print the pathname
-		of the socket for the select method and site
+		of the socket for the selected method and site
 		combination to stdout. Under unusual
 		circumstances, the path may contain LF
 		characters, but it will always be terminated

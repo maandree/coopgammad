@@ -42,7 +42,7 @@ void *nread(int fd, size_t *restrict n);
  * Not cancelled by `EINTR`
  * 
  * @param   fd   The file descriptor
- * @param   buf  The buffer which shall be written to the fail
+ * @param   buf  The buffer which shall be written to the file
  * @param   n    The size of the buffer
  * @return       The number of written bytes, less than `n`
  *               on error, cannot exceed `n`
@@ -50,7 +50,7 @@ void *nread(int fd, size_t *restrict n);
 size_t nwrite(int fd, const void *restrict buf, size_t n);
 
 /**
- * Perform a timed suspention of the process.
+ * Perform a timed suspension of the process.
  * The process resumes when the timer expires,
  * or when it is interrupted.
  * 

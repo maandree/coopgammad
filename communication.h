@@ -38,7 +38,7 @@
  * 
  * @param   ...  The error description to send
  * @return       1: Client disconnected
- *               0: Success (possibily delayed)
+ *               0: Success (possibly delayed)
  *               -1: An error occurred
  */
 #define send_error(...) ((send_error)(conn, message_id, __VA_ARGS__))
@@ -48,7 +48,7 @@
  * 
  * @param   ...  The value of `errno`, 0 to indicate success
  * @return       1: Client disconnected
- *               0: Success (possibily delayed)
+ *               0: Success (possibly delayed)
  *               -1: An error occurred
  */
 #define send_errno(...) ((send_errno)(conn, message_id, __VA_ARGS__))
@@ -59,7 +59,7 @@
  * @param   conn  The index of the connection
  * @param   buf   The data to send
  * @param   n     The size of `buf`
- * @return        Zero on success, -1 on error, 1 if disconncted
+ * @return        Zero on success, -1 on error, 1 if disconnected
  *                EINTR, EAGAIN, EWOULDBLOCK, and ECONNRESET count
  *                as success (ECONNRESET cause 1 to be returned),
  *                and are handled appropriately.
@@ -73,7 +73,7 @@ int send_message(size_t conn, char *restrict buf, size_t n);
  * @param   message_id  The ID of the message to which this message is a response
  * @param   desc        The error description to send
  * @return              1: Client disconnected
- *                      0: Success (possibily delayed)
+ *                      0: Success (possibly delayed)
  *                      -1: An error occurred
  */
 GCC_ONLY(__attribute__((__nonnull__)))
@@ -86,7 +86,7 @@ int (send_error)(size_t conn, const char *restrict message_id, const char *restr
  * @param   message_id  The ID of the message to which this message is a response
  * @param   number      The value of `errno`, 0 to indicate success
  * @return              1: Client disconnected
- *                      0: Success (possibily delayed)
+ *                      0: Success (possibly delayed)
  *                      -1: An error occurred
  */
 GCC_ONLY(__attribute__((__nonnull__)))
@@ -96,7 +96,7 @@ int (send_errno)(size_t conn, const char *restrict message_id, int number);
  * Continue sending the queued messages
  * 
  * @param   conn  The index of the connection
- * @return        Zero on success, -1 on error, 1 if disconncted
+ * @return        Zero on success, -1 on error, 1 if disconnected
  *                EINTR, EAGAIN, EWOULDBLOCK, and ECONNRESET count
  *                as success (ECONNRESET cause 1 to be returned),
  *                and are handled appropriately.

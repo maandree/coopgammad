@@ -37,7 +37,7 @@
 
 /**
  * Lists all function recognised adjustment methods,
- * will call macro X with the code for the each
+ * will call macro X with the code for each
  * adjustment method as the first argument and
  * corresponding name as the second argument
  */
